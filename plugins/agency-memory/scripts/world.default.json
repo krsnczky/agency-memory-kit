@@ -1,0 +1,43 @@
+{
+  "_comment": "Default (English) world config bundled with the plugin. A world overrides any subset of these in <world>/system/memory/world.json. A non-English instance ships its own override.",
+  "next_briefing_heading": "Next session briefing",
+  "sections": [
+    "What works",
+    "What doesn't work",
+    "Client preferences",
+    "Decisions",
+    "Next session briefing",
+    "Tried and rejected"
+  ],
+  "system_sections": [
+    "Architecture decisions",
+    "Workflow learnings",
+    "Tooling patterns",
+    "Dev decisions",
+    "Next session briefing",
+    "Tried and rejected"
+  ],
+  "protected_sections": [
+    "What works",
+    "What doesn't work",
+    "Client preferences",
+    "Decisions",
+    "Tried and rejected"
+  ],
+  "protected_system_sections": [
+    "Architecture decisions",
+    "Workflow learnings",
+    "Tooling patterns",
+    "Dev decisions",
+    "Tried and rejected"
+  ],
+  "evergreen_sections": [
+    "Client preferences",
+    "Tried and rejected"
+  ],
+  "curated_prefix": "campaigns-",
+  "memory_guard": {
+    "project_memory_path": null,
+    "guards": []
+  }
+}

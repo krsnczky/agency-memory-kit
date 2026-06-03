@@ -1,0 +1,11 @@
+{
+  "name": "agency-memory",
+  "displayName": "Agency Memory",
+  "version": "0.1.0",
+  "description": "Per-client, no-mixing memory engine for an AI agency: deterministic context loading, weekly consolidation, and human-approved candidate review.",
+  "author": {
+    "name": "Krusniczky Richárd"
+  },
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json"
+}

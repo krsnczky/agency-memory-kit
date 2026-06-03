@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd template for the weekly memory consolidation (macOS).
+
+  Why launchd over plain cron: if the Mac is asleep at the scheduled time, launchd runs
+  the missed job on the next wake. Plain cron silently skips it.
+
+  INSTALL (do NOT run blindly - fill the placeholders first):
+    1. Replace __WRAPPER_PATH__  with the absolute path to runners/run-weekly.sh
+    2. Replace __WORLD_ROOT__    with the absolute path to your world (clients/ + system/)
+    3. Make sure ~/.anthropic.env exports ANTHROPIC_API_KEY (run-weekly.sh sources it)
+    4. cp this file to ~/Library/LaunchAgents/com.agency-memory.consolidate.plist
+    5. launchctl load ~/Library/LaunchAgents/com.agency-memory.consolidate.plist
+  Runs Monday 10:00. Logs to /tmp/agency-memory-consolidate.{out,err}.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.agency-memory.consolidate</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__WRAPPER_PATH__</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>AGENCY_WORLD_ROOT</key>
+        <string>__WORLD_ROOT__</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/agency-memory-consolidate.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/agency-memory-consolidate.err.log</string>
+</dict>
+</plist>

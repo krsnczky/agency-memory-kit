@@ -1,0 +1,13 @@
+{
+  "name": "agency-memory-kit",
+  "owner": {
+    "name": "Krusniczky Richárd"
+  },
+  "plugins": [
+    {
+      "name": "agency-memory",
+      "source": "./plugins/agency-memory",
+      "description": "Per-client, no-mixing memory engine for an AI agency: deterministic context loading, weekly consolidation, and human-approved candidate review."
+    }
+  ]
+}

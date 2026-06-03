@@ -1,0 +1,64 @@
+# GitHub Actions template for the weekly memory consolidation (machine-independent).
+#
+# Use this when you want the weekly run to happen even if your Mac is off. Trade-off you
+# MUST accept first: this runs in the cloud, so your WORLD repo (clients/ + system/) is
+# checked out on a GitHub runner. If your client data is privacy-sensitive, keep the run
+# LOCAL (launchd) instead - do NOT make the cloud path the only path.
+#
+# INSTALL (fill placeholders, then commit to your WORLD repo at .github/workflows/):
+#   1. __ENGINE_REPO__  -> the engine repo, e.g. your-user/agency-memory-kit
+#   2. Add repo secret ANTHROPIC_API_KEY (Settings > Secrets and variables > Actions)
+#   3. The world repo must be PRIVATE.
+#   4. Commit this file as .github/workflows/memory-consolidate.yml in the WORLD repo.
+
+name: Weekly memory consolidation
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # Mondays 09:00 UTC (adjust for your timezone)
+  workflow_dispatch: {}    # allow manual runs
+
+permissions:
+  contents: write          # needed to commit the consolidated files back
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout world (data)
+        uses: actions/checkout@v4
+        with:
+          path: world
+
+      - name: Checkout engine (plugin)
+        uses: actions/checkout@v4
+        with:
+          repository: __ENGINE_REPO__
+          path: engine
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic
+
+      - name: Run consolidation
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 engine/plugins/agency-memory/scripts/consolidate.py --world "$GITHUB_WORKSPACE/world"
+
+      - name: Commit consolidated memory back
+        run: |
+          cd world
+          git config user.name "agency-memory-bot"
+          git config user.email "actions@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: weekly memory consolidation"
+            git push
+          fi

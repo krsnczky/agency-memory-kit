@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Temp / working files
+*.tmp
+
+# consolidate.py pre-consolidation backups (regenerable safety nets; recover via git history)
+system/memory/archive/backup/learnings-backup-*.md
+clients/*/memory/archive/backup/learnings-backup-*.md
+
+# Session trace archives (ephemeral)
+system/logs/sessions/*
+!system/logs/sessions/.gitkeep

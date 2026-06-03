@@ -1,0 +1,60 @@
+{
+  "_comment": "World config = the instance layer. The plugin ships English defaults (world.default.json); this file OVERRIDES any subset of them. You only need the keys you actually change. To activate: copy to world.json (same folder) and edit. This example shows a Hungarian instance.",
+
+  "_comment_sections": "If you localize section names here, your learnings.md / system learnings.md section headers MUST match these strings exactly (the engine splits on them).",
+
+  "next_briefing_heading": "Következő session briefing",
+
+  "sections": [
+    "Kampány learningek",
+    "Mi nem működik",
+    "Ügyfél preferenciák",
+    "Döntési log",
+    "Következő session briefing",
+    "Próbált és elvetett"
+  ],
+
+  "system_sections": [
+    "Architektúra döntések",
+    "Workflow tanulságok",
+    "Tooling minták",
+    "Fejlesztői döntések",
+    "Következő session briefing",
+    "Próbált és elvetett"
+  ],
+
+  "protected_sections": [
+    "Kampány learningek",
+    "Mi nem működik",
+    "Ügyfél preferenciák",
+    "Döntési log",
+    "Próbált és elvetett"
+  ],
+
+  "protected_system_sections": [
+    "Architektúra döntések",
+    "Workflow tanulságok",
+    "Tooling minták",
+    "Fejlesztői döntések",
+    "Próbált és elvetett"
+  ],
+
+  "evergreen_sections": [
+    "Ügyfél preferenciák",
+    "Próbált és elvetett"
+  ],
+
+  "curated_prefix": "kampanyok-",
+
+  "_comment_memory_guard": "Optional. project_memory_path = where the agent's global auto-memory lives (null = derive from world root, matching Claude Code's ~/.claude/projects/<slug>/memory scheme). guards = file-path patterns -> memory files to surface before a Write/Edit. Empty guards = the PreToolUse hook is a no-op.",
+  "memory_guard": {
+    "project_memory_path": null,
+    "guards": [
+      {
+        "patterns": ["clients/", "riports/", "audits/"],
+        "memories": ["feedback_no_write_without_approval.md"],
+        "label": "Client Output"
+      }
+    ]
+  }
+}
