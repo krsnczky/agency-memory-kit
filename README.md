@@ -106,6 +106,19 @@ claude plugin install agency-memory@agency-memory-kit --scope local
 # slash equivalent (in a session started from that folder): /plugin install agency-memory@agency-memory-kit --scope local
 ```
 
+**From the Claude desktop app (GUI), instead of the terminal.** The desktop app manages the
+same Claude Code plugins through its plugin UI. To install there, skip terminal steps 2-3 and:
+
+1. Open the plugin manager (Customize / Settings) and click **Add marketplace**.
+2. In the URL field, enter the marketplace repo as a GitHub `owner/repo` (e.g.
+   `krsnczky/agency-memory-kit`) or its git URL, then **Sync**. The GUI accepts a GitHub repo
+   or git URL only - **not a local path** - so the repo must be on GitHub and your account
+   must have access (a collaborator on a private repo, or a public repo).
+3. Open the synced marketplace and enable the **agency-memory** plugin.
+
+It installs as a normal Claude Code plugin. The world setup below is the same; use it in a
+Claude Code session opened on your world folder.
+
 **4. Set up a world (your data root).** Use this repo's root as a ready-made world, or
 scaffold a fresh one from the bundled template (run from your clone):
 
