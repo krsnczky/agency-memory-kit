@@ -66,42 +66,65 @@ change.
 
 ## Install
 
-**1. Add this repo as a plugin marketplace and install the plugin.**
+> **Run these in a terminal**, using the `claude` CLI. The `/plugin` command and the
+> `claude plugin ...` subcommands are not available inside the VS Code / JetBrains
+> extension UI - open a terminal (the IDE's built-in terminal is fine). If `claude` is
+> not on your `PATH`, call it by its full path (commonly `~/.local/bin/claude`).
 
-In Claude Code:
-
-```
-/plugin marketplace add <git-url-or-local-path-to-this-repo>
-/plugin install agency-memory@agency-memory-kit
-```
-
-(For local development you can point the marketplace at your local clone path.)
-
-**2. Set up a world (your data root).**
-
-Either use a fresh folder scaffolded from the bundled template, or use this repo's root
-(it already contains a `system/memory/` and a `clients/_template`).
+**1. (Optional) Validate the plugin** from your clone:
 
 ```bash
-# fresh world from the template:
-cp -r plugins/agency-memory/templates/world/* /path/to/my-agency-world/
+claude plugin validate ./agency-memory-kit/plugins/agency-memory
 ```
 
-Then run Claude Code from your world folder. The plugin hooks fire automatically and
-resolve your data via `CLAUDE_PROJECT_DIR`.
+**2. Add the marketplace.** A local path must start with `./` (a bare `.` is rejected),
+so run this from the folder that *contains* your clone:
 
-**3. (Optional) Localize.** Copy `system/memory/world.json.example` to
+```bash
+claude plugin marketplace add ./agency-memory-kit
+# once it is hosted on git, you can instead use: claude plugin marketplace add <git-url>
+```
+
+**3. Install the plugin** - mind the scope:
+
+```bash
+claude plugin install agency-memory@agency-memory-kit
+```
+
+`--scope` defaults to `user`, which makes the plugin active in **every** Claude Code
+project you open. If you already run Claude Code in another repo that ships its **own**
+memory hooks, a user-scope install will double-fire there. To keep it bound to one world,
+`cd` into that world and add `--scope local`:
+
+```bash
+cd /path/to/my-world
+claude plugin install agency-memory@agency-memory-kit --scope local
+```
+
+**4. Set up a world (your data root).** Use this repo's root as a ready-made world, or
+scaffold a fresh one from the bundled template (run from your clone):
+
+```bash
+cp -r agency-memory-kit/plugins/agency-memory/templates/world/. /path/to/my-world/
+```
+
+The scaffold ships a `CLAUDE.md` (the memory protocol the agent follows), the
+`system/memory/` files, and an empty `clients/`. Run Claude Code from your world folder;
+the hooks fire automatically and resolve your data via `CLAUDE_PROJECT_DIR`.
+
+**5. (Optional) Localize.** In your world, copy `system/memory/world.json.example` to
 `system/memory/world.json` and edit it to override section names, the briefing heading,
 the curated-file prefix, and the memory guards. Anything you do not set falls back to the
 plugin's English defaults.
 
 ## Usage
 
-**Create a client** (run from the kit repo, which carries the `_template`):
+**Create a client.** Copy the bundled client template into your world's `clients/`:
 ```bash
-bash new-client.sh acme-corp
+cp -r agency-memory-kit/plugins/agency-memory/templates/client /path/to/my-world/clients/acme-corp
 ```
-Then fill in the placeholders in `clients/acme-corp/wiki/`.
+Then fill in the placeholders in `clients/acme-corp/wiki/`. (If you are working inside this
+kit repo itself, `bash new-client.sh acme-corp` does the same from `clients/_template`.)
 
 **Daily:** just work. Mention the client, Claude loads its context. At session end (or
 when you `/compact`), Claude writes the session's learnings into that client's folder.
