@@ -66,10 +66,12 @@ change.
 
 ## Install
 
-> **Run these in a terminal**, using the `claude` CLI. The `/plugin` command and the
-> `claude plugin ...` subcommands are not available inside the VS Code / JetBrains
-> extension UI - open a terminal (the IDE's built-in terminal is fine). If `claude` is
-> not on your `PATH`, call it by its full path (commonly `~/.local/bin/claude`).
+> **Installation goes through the marketplace** (`.claude-plugin/marketplace.json`) - that
+> is the catalog the plugin installs from. You can drive it two ways, both in a **terminal**:
+> the `/plugin ...` slash commands inside a terminal Claude Code session, or the
+> `claude plugin ...` CLI subcommands. The `/plugin` command is **not** available in the
+> VS Code / JetBrains extension UI, so use a terminal. If `claude` is not on your `PATH`,
+> call it by its full path (commonly `~/.local/bin/claude`).
 
 **1. (Optional) Validate the plugin** from your clone:
 
@@ -77,28 +79,31 @@ change.
 claude plugin validate ./agency-memory-kit/plugins/agency-memory
 ```
 
-**2. Add the marketplace.** A local path must start with `./` (a bare `.` is rejected),
-so run this from the folder that *contains* your clone:
+**2. Add the marketplace and install.** Inside a terminal Claude Code session, the slash form:
+
+```
+/plugin marketplace add ./agency-memory-kit
+/plugin install agency-memory@agency-memory-kit
+```
+
+Or the equivalent CLI (copy-paste friendly). A local marketplace path must start with `./`
+(a bare `.` is rejected), so run it from the folder that *contains* your clone:
 
 ```bash
 claude plugin marketplace add ./agency-memory-kit
-# once it is hosted on git, you can instead use: claude plugin marketplace add <git-url>
-```
-
-**3. Install the plugin** - mind the scope:
-
-```bash
 claude plugin install agency-memory@agency-memory-kit
+# once hosted on git you can instead use: claude plugin marketplace add <owner/repo or git-url>
 ```
 
-`--scope` defaults to `user`, which makes the plugin active in **every** Claude Code
-project you open. If you already run Claude Code in another repo that ships its **own**
-memory hooks, a user-scope install will double-fire there. To keep it bound to one world,
-`cd` into that world and add `--scope local`:
+**3. Mind the install scope.** Both forms install at `--scope user` by default, which makes
+the plugin active in **every** Claude Code project you open. If you already run Claude Code
+in another repo that ships its **own** memory hooks, a user-scope install double-fires there.
+To bind it to one world, `cd` into that world and install with local scope:
 
 ```bash
 cd /path/to/my-world
 claude plugin install agency-memory@agency-memory-kit --scope local
+# slash equivalent (in a session started from that folder): /plugin install agency-memory@agency-memory-kit --scope local
 ```
 
 **4. Set up a world (your data root).** Use this repo's root as a ready-made world, or
