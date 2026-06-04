@@ -27,6 +27,7 @@ Changelog:
 
 import json
 import os
+import re
 from pathlib import Path
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "world.default.json"
@@ -81,6 +82,9 @@ def load_world_config(world_root):
 def default_project_memory_path(world_root):
     """Derive the Claude Code project auto-memory dir from the world root,
     matching Claude Code's own slug scheme: ~/.claude/projects/<slug>/memory
-    where <slug> is the absolute world path with '/' replaced by '-'."""
-    slug = str(Path(world_root).resolve()).replace("/", "-")
+    where <slug> is the absolute world path with every character outside
+    [A-Za-z0-9_-] replaced by '-'. NB: this includes spaces (e.g. a path like
+    '.../Axon Digital' -> '...-Axon-Digital'), dots, etc. - not just '/'. Verified
+    against real slugs (incl. a 'First project' -> 'First-project' case)."""
+    slug = re.sub(r"[^A-Za-z0-9_-]", "-", str(Path(world_root).resolve()))
     return Path("~/.claude/projects").expanduser() / slug / "memory"

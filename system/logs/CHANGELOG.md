@@ -5,6 +5,18 @@ _System/dev changes. Append newest at top with a date and a tag:
 
 ---
 
+## 2026-06-04
+
+- [FIX] **v0.1.1.** `memory-guard` project-memory slug derivation now matches Claude Code's
+  real scheme: every char outside `[A-Za-z0-9_-]` -> `-` (was: only `/`). Fixes worlds whose
+  path contains a **space** (e.g. `.../Axon Digital`) - the derived dir mismatched Claude
+  Code's actual `...-Axon-Digital`, so the guard read the wrong memory dir. Found in the Ádám
+  beta. Verified against real slugs (incl. a `First project` -> `First-project` case). The
+  explicit `memory_guard.project_memory_path` override remains as an escape hatch.
+- [DOC] Same release rolls up the day's onboarding fixes: world scaffold `CLAUDE.md` +
+  `CHANGELOG.md` stub, README install (desktop GUI first, both `/plugin` and CLI forms),
+  MIT license. Version bumped 0.1.0 -> 0.1.1 so installs auto-update.
+
 ## 2026-06-03
 
 - [INFRA] **Plugin conversion (full).** The kit is now a Claude Code plugin under
