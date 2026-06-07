@@ -57,12 +57,34 @@ change.
   losslessly (no entry is evicted automatically), regenerates `cross-client-patterns.md`,
   and surfaces candidate lists - durable rules worth promoting, plus superseded/stale
   entries proposed for archiving. Archiving and promotion happen only with your approval.
+- **Self-improving tool-craft (weekly, since 0.2.0):** the weekly run mines your session
+  transcripts for *recurring* tool mistakes (the same tool used wrong across several
+  sessions, or a tool you keep rejecting). It proposes them as `tool-craft` candidates.
+  When you approve one, it becomes a rule in `system/memory/tool-craft.md`. Enforceable
+  rules are read by a `PreToolUse` guard that **warns** before the matching call (WARN-only,
+  it never blocks). A rule only becomes a hard block with a separate, explicit approval -
+  so the system goes from "I told you" to "you can't", on your say-so.
+- **cheap-Dreaming (weekly, since 0.2.0):** for sessions that were cleanly about a single
+  client, the weekly run mines the *raw* transcript for durable client learnings that the
+  end-of-session capture missed (e.g. abandoned/compacted sessions). A strict single-client
+  gate keeps no-mixing intact; candidates go to `client-learning-candidates.md` for review.
 
 ## Requirements
 
 - Claude Code with plugin support
 - `python3` (the hooks and scripts use it)
 - `anthropic` Python package + `ANTHROPIC_API_KEY` - only for the weekly `consolidate.py`
+  (since 0.2.0 it also runs the tool-craft judge and the cheap-Dreaming miner, which adds a
+  small per-run cost that scales with how many sessions you had that week)
+
+### Upgrading from 0.1.x to 0.2.0
+
+The engine update brings the new scripts, the `PreToolUse` tool-craft guard, and the
+`tool-craft.md` template. Your existing world data is never overwritten, so the new
+`system/memory/tool-craft.md` is **seeded automatically** on your first weekly
+`consolidate.py` run after the update (the guard is a harmless no-op until it exists). No
+manual step. The guard ships in **WARN mode**: it warns, never blocks, until you explicitly
+promote a rule.
 
 ## Install
 

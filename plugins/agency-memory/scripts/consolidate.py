@@ -263,6 +263,24 @@ def read_file(path):
     return path.read_text(encoding="utf-8")
 
 
+def _ensure_tool_craft_scaffold():
+    """Existing worlds (scaffolded before the tool-craft feature) have no tool-craft.md, and an
+    engine update never re-scaffolds world data. Seed it from the plugin template if MISSING so
+    the feature self-bootstraps (the engine creates a missing scaffold file; it never overwrites
+    an existing one). Lets a 0.1.x -> 0.2.0 upgrade pick up the feature with no manual step."""
+    try:
+        target = REPO_ROOT / "system" / "memory" / "tool-craft.md"
+        if target.exists():
+            return
+        tmpl = Path(__file__).resolve().parent.parent / "templates" / "world" / "system" / "memory" / "tool-craft.md"
+        if tmpl.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(tmpl.read_text(encoding="utf-8"), encoding="utf-8")
+            print("  [scaffold] seeded missing tool-craft.md from template (0.2.0 upgrade)")
+    except Exception:
+        pass
+
+
 def _audit_consolidation(scope, before, after, backup_path):
     """Lightweight audit trail: one line per consolidation into consolidation-audit.md, pointing
     at the pre-consolidation backup (the diffable record of what changed). Never breaks the run."""
@@ -951,6 +969,7 @@ def main():
                     + detect_wiki_promotion_candidates(dry_run=args.dry_run)
                     + detect_new_extractors(dry_run=args.dry_run))
         if not args.dry_run:
+            _ensure_tool_craft_scaffold()  # self-bootstrap for 0.1.x -> 0.2.0 upgrades
             state = sync_candidates(detected, load_state())
             save_state(state)
             write_review_files(state)
