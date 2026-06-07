@@ -263,6 +263,22 @@ def read_file(path):
     return path.read_text(encoding="utf-8")
 
 
+def _audit_consolidation(scope, before, after, backup_path):
+    """Lightweight audit trail: one line per consolidation into consolidation-audit.md, pointing
+    at the pre-consolidation backup (the diffable record of what changed). Never breaks the run."""
+    try:
+        p = REPO_ROOT / "system" / "memory" / "consolidation-audit.md"
+        if not p.exists():
+            p.write_text("# Consolidation audit trail\n\n_One line per run; the backup is the diffable "
+                         "pre-consolidation state. The weekly LLM pass resolves contradictions; the "
+                         "backup -> current diff shows what it merged/replaced._\n\n", encoding="utf-8")
+        rel = backup_path.relative_to(REPO_ROOT) if str(backup_path).startswith(str(REPO_ROOT)) else backup_path
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(f"- {TODAY} | {scope} | {before}->{after} chars | backup: `{rel}`\n")
+    except Exception:
+        pass
+
+
 def consolidate_client(client_dir_name, dry_run=False):
     client_path = CLIENTS_DIR / client_dir_name
     learnings_path = client_path / "memory" / "learnings.md"
@@ -355,6 +371,7 @@ IMPORTANT RULES:
     # (rebuild_learnings protected=). Archiving (superseded + stale) goes through the
     # Phase 3 sweep-candidate path with human approval.
     learnings_path.write_text(consolidated, encoding="utf-8")
+    _audit_consolidation(client_dir_name, len(learnings), len(consolidated), backup_path)
     print(f"  [{client_dir_name}] OK - consolidated ({len(learnings)} -> {len(consolidated)} chars, lossless)")
     return True
 
@@ -446,6 +463,7 @@ IMPORTANT RULES:
 
     # Weekly run = LOSSLESS (see consolidate_client). Archiving -> Phase 3 sweep.
     learnings_path.write_text(consolidated, encoding="utf-8")
+    _audit_consolidation("system", len(learnings), len(consolidated), backup_path)
     print(f"  [system] OK - consolidated ({len(learnings)} -> {len(consolidated)} chars, lossless)")
     return True
 
@@ -620,6 +638,8 @@ Your job: surface ARCHIVABLE (sweep) candidates. ONLY two reasons count:
 
 (a) SUPERSEDED: there is a NEWER entry about the same entity (campaign/setting/decision) that overrides the old one - the old one is no longer valid.
 (b) STALE: a finished one-off event, a closed/ended campaign, or a learning proven invalid.
+
+BI-TEMPORAL SIGNAL: if an entry carries an `[as of: YYYY-MM-DD]` marker and that date is OLD (months ago) AND it is about a finished/closed thing, it is a STRONGER stale candidate. The "as of" date = when it was true (not when recorded); an old "as of" date on a passing event = outdated. A durable baseline/preference with an old date is NOT stale.
 
 Date: {TODAY}
 Source: [{scope}]
@@ -831,7 +851,54 @@ def write_review_files(state):
           f"_Last run: {TODAY}_\n\n---\n\n"
           + ("\n".join(fmt(c) for c in wiki) if wiki else "_No open wiki-promotion candidates._") + "\n")
     WIKI_PROMOTION_CANDIDATES_PATH.write_text(wc, encoding="utf-8")
-    print(f"  [candidates] open: {len(promo)} promotion + {len(sweep)} sweep + {len(wiki)} wiki-promotion -> review files + state")
+
+    # Cadence: tool-craft + client-learning review files (new candidate types)
+    craft = [c for c in opens if c["type"] == "tool-craft"]
+    learn = [c for c in opens if c["type"] == "client-learning"]
+    tc = (f"# Tool-craft candidates (system-level, enforcement)\n\n"
+          f"_Regenerated weekly. Tool-usage craft lessons from transcript mining. Once approved, "
+          f"add to `tool-craft.md` (WARN gate / advisory). Accept/reject by the candidate's `#id`._\n\n"
+          f"_Last run: {TODAY}_\n\n---\n\n"
+          + ("\n".join(fmt(c) for c in craft) if craft else "_No open tool-craft candidates._") + "\n")
+    (REPO_ROOT / "system" / "memory" / "tool-craft-candidates.md").write_text(tc, encoding="utf-8")
+    cl = (f"# Client-learning candidates (cheap-Dreaming)\n\n"
+          f"_Regenerated weekly. Client learnings mined from raw transcripts (MEDIUM gate, no-mixing). "
+          f"Once approved, add to the client's learnings.md / wiki. Accept/reject by the candidate's `#id`._\n\n"
+          f"_Last run: {TODAY}_\n\n---\n\n"
+          + ("\n".join(fmt(c) for c in learn) if learn else "_No open client-learning candidates._") + "\n")
+    (REPO_ROOT / "system" / "memory" / "client-learning-candidates.md").write_text(cl, encoding="utf-8")
+
+    print(f"  [candidates] open: {len(promo)} promotion + {len(sweep)} sweep + {len(wiki)} wiki-promotion "
+          f"+ {len(craft)} tool-craft + {len(learn)} client-learning -> review files + state")
+
+
+def detect_new_extractors(dry_run=False):
+    """Cadence: tool-craft (craft_judge) + client-learning (dream_extractor) candidates from
+    transcript mining. FAULT-TOLERANT: if anything fails (API/transcript/import), the existing
+    consolidation does NOT break - returns [] and moves on. dry_run: no API calls (candidates()
+    would be costly), just notes it would run."""
+    if dry_run:
+        print("  [new-extractors] dry-run: skipped (avoid API cost)")
+        return []
+    try:
+        import transcript_lib
+        import craft_judge
+        import dream_extractor
+    except Exception as e:
+        print(f"  [new-extractors] import error, skipped: {e}")
+        return []
+    try:
+        tdir = transcript_lib.transcript_dir(REPO_ROOT)  # explicit world-root (cron cwd != root)
+        craft = craft_judge.candidates(tdir)
+        learn = dream_extractor.candidates(tdir, days=7)
+        # cross-stream dedup: a client-learning that is really a tool-craft -> system-level (dropped here)
+        ctok = [_tokens(c["text"]) for c in craft]
+        learn = [l for l in learn if not any(_same_candidate(_tokens(l["text"]), ct) for ct in ctok)]
+        print(f"  [new-extractors] {len(craft)} tool-craft + {len(learn)} client-learning")
+        return craft + learn
+    except Exception as e:
+        print(f"  [new-extractors] run error, skipped: {e}")
+        return []
 
 
 def main():
@@ -881,7 +948,8 @@ def main():
         print(f"\nCandidate detection (promotion + sweep + wiki-promotion) | {TODAY}")
         detected = (detect_promotion_candidates(dry_run=args.dry_run)
                     + detect_sweep_candidates(dry_run=args.dry_run)
-                    + detect_wiki_promotion_candidates(dry_run=args.dry_run))
+                    + detect_wiki_promotion_candidates(dry_run=args.dry_run)
+                    + detect_new_extractors(dry_run=args.dry_run))
         if not args.dry_run:
             state = sync_candidates(detected, load_state())
             save_state(state)
