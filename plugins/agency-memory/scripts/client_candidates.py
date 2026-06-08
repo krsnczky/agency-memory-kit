@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
 client_candidates.py
-Purpose: Print one client's OPEN memory candidates (wiki-promotion + sweep) from
-         candidates-state.json. Point-of-use surfacing: when you work on that client,
-         only THAT client's candidates come up (no-mixing, clarity). Promotion candidates
-         (scope=global) are NOT client-scoped - they stay in the global nudge.
-         Pure stdlib (no anthropic), read-only.
+Purpose: Print one client's OPEN memory candidates (client-learning + wiki-promotion + sweep)
+         from candidates-state.json. Point-of-use surfacing: when you work on that client,
+         only THAT client's candidates come up (no-mixing, clarity). Promotion (scope=global)
+         and tool-craft (scope=system) are NOT client-scoped - they stay in the global nudge /
+         review files. Pure stdlib (no anthropic), read-only.
 Usage:
   python3 client_candidates.py acme-corp   # world via AGENCY_WORLD_ROOT / CLAUDE_PROJECT_DIR / cwd
 Changelog:
   2026-06-03 - Plugin conversion: STATE_PATH via agency_common world-root.
+  2026-06-08 - Added the client-learning type to CLIENT_TYPES (the dream_extractor v2 stream
+               was missing from point-of-use surfacing - found during beta review).
 """
 
 import json
@@ -19,7 +21,7 @@ from datetime import datetime
 from agency_common import resolve_world_root
 
 STATE_PATH = resolve_world_root() / "system" / "memory" / "candidates-state.json"
-CLIENT_TYPES = ("wiki-promotion", "sweep")
+CLIENT_TYPES = ("client-learning", "wiki-promotion", "sweep")
 
 
 def _weeks_since(date_str):
@@ -55,10 +57,15 @@ def main():
     if not rows:
         return
 
+    learn = [c for c in rows if c["type"] == "client-learning"]
     wiki = [c for c in rows if c["type"] == "wiki-promotion"]
     sweep = [c for c in rows if c["type"] == "sweep"]
 
     print(f"🔔 [{client}] memory candidate review waiting (from weekly consolidation):")
+    if learn:
+        print("  CLIENT-LEARNING (durable learning from the transcript -> memory/learnings.md):")
+        for c in learn:
+            print(f"    #{c['id']} ({_age(c)}) {c['text']}")
     if wiki:
         print("  WIKI-PROMOTION (durable account fact -> campaigns-<area>.md):")
         for c in wiki:

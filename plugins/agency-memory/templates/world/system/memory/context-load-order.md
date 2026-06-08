@@ -12,7 +12,7 @@ _Edit the task table below to match your agency's work. The rows are examples._
 2. `clients/[client]/wiki/index.md` - navigation, IDs, budget
 3. `clients/[client]/wiki/hot.md` - current state, open TODOs
 4. `clients/[client]/memory/learnings.md` - operational learnings (full load = primary client memory)
-5. **Candidate surfacing (point-of-use, optional):** only relevant once the weekly consolidation has run (it ships with the agency-memory plugin and writes `candidates-state.json`). If there are open candidates for THIS client (wiki-promotion or sweep), surface them for review (id + text) - **for this client only**, never mix in another's. Accept/reject by `#id`: on accept you apply it (wiki-promotion fact -> `campaigns-[area].md`; sweep -> archive) and set the status in `candidates-state.json` to `accepted`/`rejected`. (The plugin ships `client_candidates.py` to print one client's open candidates; until you have wired the weekly run, skip this step.)
+5. **Candidate surfacing (point-of-use, optional):** only relevant once the weekly consolidation has run (it ships with the agency-memory plugin and writes `candidates-state.json`). If there are open candidates for THIS client (client-learning, wiki-promotion or sweep), surface them for review (id + text) - **for this client only**, never mix in another's. Accept/reject by `#id`: on accept you apply it (client-learning -> the right section of `memory/learnings.md`; wiki-promotion fact -> `campaigns-[area].md`; sweep -> archive) and set the status in `candidates-state.json` to `accepted`/`rejected`. (The plugin ships `client_candidates.py` to print one client's open candidates; until you have wired the weekly run, skip this step.)
 
 ---
 

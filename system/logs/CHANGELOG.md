@@ -5,6 +5,16 @@ _System/dev changes. Append newest at top with a date and a tag:
 
 ---
 
+## 2026-06-08
+
+- [FIX] **v0.2.1.** `client_candidates.py` (point-of-use per-client surfacing) now includes the
+  `client-learning` type in `CLIENT_TYPES` (was: only `wiki-promotion` + `sweep`). The
+  `dream_extractor` v2 stream produces `client-learning` candidates, but they were never
+  surfaced when loading a client - so the biggest new stream was invisible at point-of-use.
+  Found during the live beta review. Added a CLIENT-LEARNING display block and updated the
+  world scaffold `context-load-order.md` step 5 (accept path: client-learning -> the right
+  section of `memory/learnings.md`).
+
 ## 2026-06-04
 
 - [FIX] **v0.1.1.** `memory-guard` project-memory slug derivation now matches Claude Code's
