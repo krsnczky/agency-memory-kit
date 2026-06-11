@@ -1,0 +1,19 @@
+# systemd user TIMER template - Linux weekly consolidation (Mondays 10:00).
+# Pairs with agency-memory-consolidate.service.template.
+#
+# Persistent=true is the launchd equivalent: if the machine was off/asleep at the
+# scheduled time, the job runs on the next boot. Plain cron does NOT catch up.
+#
+# Cron alternative (simpler, but NO catch-up on missed runs):
+#   crontab -e, then:
+#   0 10 * * 1 AGENCY_WORLD_ROOT=/path/to/world /usr/bin/env bash /path/to/run-weekly.sh >> /tmp/agency-memory-consolidate.log 2>&1
+
+[Unit]
+Description=Weekly Agency Memory consolidation
+
+[Timer]
+OnCalendar=Mon *-*-* 10:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

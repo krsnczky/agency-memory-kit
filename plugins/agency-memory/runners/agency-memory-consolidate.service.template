@@ -1,0 +1,19 @@
+# systemd user SERVICE template - Linux weekly consolidation.
+# Pairs with agency-memory-consolidate.timer.template.
+#
+# INSTALL (fill placeholders, then):
+#   1. __WRAPPER_PATH__  -> absolute path to runners/run-weekly.sh
+#   2. __WORLD_ROOT__    -> absolute path to your world (clients/ + system/)
+#   3. Make sure ~/.anthropic.env exports ANTHROPIC_API_KEY (run-weekly.sh sources it)
+#   4. cp this (without .template) to ~/.config/systemd/user/agency-memory-consolidate.service
+#   5. cp the .timer too, then: systemctl --user daemon-reload
+#      systemctl --user enable --now agency-memory-consolidate.timer
+#   (For the timer to fire while you are logged out: `loginctl enable-linger $USER`.)
+
+[Unit]
+Description=Agency Memory weekly consolidation
+
+[Service]
+Type=oneshot
+Environment=AGENCY_WORLD_ROOT=__WORLD_ROOT__
+ExecStart=/usr/bin/env bash __WRAPPER_PATH__

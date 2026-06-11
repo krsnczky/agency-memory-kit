@@ -168,15 +168,21 @@ regenerates `cross-client-patterns.md`, and refreshes the candidate review files
 in `candidates-state.json`. The "Next session briefing" is preserved verbatim. Nothing is
 archived or promoted automatically - those are your approvals, surfaced by id.
 
-**Schedule it.** Two templates ship in `plugins/agency-memory/runners/` (fill the
-placeholders, neither auto-installs):
+**Schedule it.** Templates ship in `plugins/agency-memory/runners/` (fill the
+placeholders, none auto-installs):
 
-- `com.agency-memory.consolidate.plist.template` - macOS launchd. Preferred locally:
+- `com.agency-memory.consolidate.plist.template` - **macOS** launchd. Preferred locally:
   if the Mac is asleep at the scheduled time, launchd runs the missed job on next wake;
   plain cron silently skips it.
-- `github-actions-consolidate.yml.template` - machine-independent cloud run. Trade-off:
-  it checks out your world (client data) on a GitHub runner, so keep the world repo
-  private, and do not make the cloud path your only path if the data is sensitive.
+- `agency-memory-consolidate.service.template` + `.timer.template` - **Linux** systemd
+  user timer. `Persistent=true` is the launchd equivalent: a missed run (machine off)
+  fires on next boot. A plain-cron one-liner is in the timer template's header.
+- `github-actions-consolidate.yml.template` - **any OS**, machine-independent cloud run.
+  Trade-off: it checks out your world (client data) on a GitHub runner, so keep the world
+  repo private, and do not make the cloud path your only path if the data is sensitive.
+
+The daily hooks themselves are cross-platform Python (one is a small bash hook that works
+on macOS + Linux; a pure-Python Windows path is on the roadmap).
 
 ## Structure
 

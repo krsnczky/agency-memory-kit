@@ -5,6 +5,16 @@ _System/dev changes. Append newest at top with a date and a tag:
 
 ---
 
+## 2026-06-11
+
+- [INFRA] **v0.2.2 - Linux scheduler support.** Added `agency-memory-consolidate.service.template`
+  + `.timer.template` (systemd user timer) for the weekly run on Linux. `Persistent=true` is
+  the launchd equivalent (catches a missed run after the machine was off); a plain-cron
+  one-liner is in the timer header. README schedule section now lists macOS / Linux / cloud
+  per OS. Note: the daily hooks already run on Linux (the one bash hook has a GNU `stat -c`
+  fallback). Windows (pure-Python session-logger + python/python3 invocation + Task Scheduler)
+  is the next cross-platform step.
+
 ## 2026-06-08
 
 - [FIX] **v0.2.1.** `client_candidates.py` (point-of-use per-client surfacing) now includes the
