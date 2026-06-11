@@ -80,14 +80,9 @@ change.
   (since 0.2.0 it also runs the tool-craft judge and the cheap-Dreaming miner, which adds a
   small per-run cost that scales with how many sessions you had that week)
 
-### Upgrading from 0.1.x to 0.2.0
-
-The engine update brings the new scripts, the `PreToolUse` tool-craft guard, and the
-`tool-craft.md` template. Your existing world data is never overwritten, so the new
-`system/memory/tool-craft.md` is **seeded automatically** on your first weekly
-`consolidate.py` run after the update (the guard is a harmless no-op until it exists). No
-manual step. The guard ships in **WARN mode**: it warns, never blocks, until you explicitly
-promote a rule.
+> Upgrading from an earlier version? See [CHANGELOG.md](CHANGELOG.md) for what changed and any
+> upgrade notes. Your existing world data is never overwritten; new engine files are seeded on
+> your first weekly `consolidate.py` run after the update.
 
 ## Install
 
