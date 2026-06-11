@@ -7,6 +7,13 @@ _System/dev changes. Append newest at top with a date and a tag:
 
 ## 2026-06-11
 
+- [INFRA] **v0.2.3 - cross-platform hooks (Windows-capable).** Ported the one bash hook
+  (`session-logger.sh` -> `session-logger.py`, stdlib only) so all 5 hooks are pure Python
+  with no bash/`stat` dependency - they now run on macOS, Linux, AND Windows. Removed the
+  `.sh`. Added `run-weekly.ps1` (Windows Task Scheduler wrapper, with the schedule +
+  catch-up note in its header). **Provisional:** Windows is not yet end-to-end tested; the
+  one open question is `python3` vs `python` on Windows (the hook command uses `python3`;
+  verify on a real Windows machine).
 - [INFRA] **v0.2.2 - Linux scheduler support.** Added `agency-memory-consolidate.service.template`
   + `.timer.template` (systemd user timer) for the weekly run on Linux. `Persistent=true` is
   the launchd equivalent (catches a missed run after the machine was off); a plain-cron

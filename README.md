@@ -177,12 +177,16 @@ placeholders, none auto-installs):
 - `agency-memory-consolidate.service.template` + `.timer.template` - **Linux** systemd
   user timer. `Persistent=true` is the launchd equivalent: a missed run (machine off)
   fires on next boot. A plain-cron one-liner is in the timer template's header.
+- `run-weekly.ps1` - **Windows** PowerShell wrapper for Task Scheduler (the schedule +
+  catch-up note is in its header). Provisional: the cross-platform hooks are in place, but
+  Windows has not been end-to-end tested yet.
 - `github-actions-consolidate.yml.template` - **any OS**, machine-independent cloud run.
   Trade-off: it checks out your world (client data) on a GitHub runner, so keep the world
   repo private, and do not make the cloud path your only path if the data is sensitive.
 
-The daily hooks themselves are cross-platform Python (one is a small bash hook that works
-on macOS + Linux; a pure-Python Windows path is on the roadmap).
+The daily hooks are all pure-Python (stdlib only), so they run on macOS, Linux, and
+Windows with no bash dependency. The only cross-platform caveat: the hook command uses
+`python3`; on Windows that name may be `python` (verify with `python3 --version`).
 
 ## Structure
 
