@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-06-22
+
 ### Added
 - Bootstrap installers (`install.sh` for macOS/Linux, `install.ps1` for Windows): detect
   Python 3, offer to install it (Homebrew/apt/dnf/pacman/zypper, or winget on Windows), and
