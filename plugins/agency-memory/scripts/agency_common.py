@@ -84,7 +84,7 @@ def default_project_memory_path(world_root):
     matching Claude Code's own slug scheme: ~/.claude/projects/<slug>/memory
     where <slug> is the absolute world path with every character outside
     [A-Za-z0-9_-] replaced by '-'. NB: this includes spaces (e.g. a path like
-    '.../Axon Digital' -> '...-Axon-Digital'), dots, etc. - not just '/'. Verified
+    '.../My Agency' -> '...-My-Agency'), dots, etc. - not just '/'. Verified
     against real slugs (incl. a 'First project' -> 'First-project' case)."""
     slug = re.sub(r"[^A-Za-z0-9_-]", "-", str(Path(world_root).resolve()))
     return Path("~/.claude/projects").expanduser() / slug / "memory"
