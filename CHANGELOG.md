@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (5 hooks + `consolidate.py`, `client_candidates.py`, `candidates_nudge.py`) now forces
   `sys.stdout/stderr` to UTF-8. On a cp1250 (etc.) console, emoji in hook output raised
   `UnicodeEncodeError` and aborted the prompt; macOS/Linux default to UTF-8 so it was invisible there.
+- **`install.ps1` never selected `python`/`python3` (only `py -3`):** for a single-token
+  command the arg slice `$parts[1..0]` is a *descending* PowerShell range that wrongly returned
+  the command name as a spurious argument, so the probe failed. Guarded the slice for the
+  single-token case (3 spots; the per-`$PyCmd` split is now computed once and reused).
+- **`run-weekly.ps1` hardcoded `python`:** a scheduled run on a box where the real interpreter
+  is `py -3`/`python3` could hit the Microsoft Store stub and fail silently. The runner now
+  auto-detects the interpreter (prefers `py -3`), overridable via `AGENCY_PYTHON`.
 
 ### Changed
 - World template `CLAUDE.md`: system/dev session logging now explicitly creates
@@ -37,10 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `python3`; Microsoft Store alias-stub gotcha).
 
 ### Notes
-- Windows blockers above were found on a real Windows 10 / cp1250 test (Claude Code 2.1.185,
-  Python 3.13). The weekly consolidation ran end-to-end (manual + Task Scheduler) once fixed.
-- Still unverified on Windows: the `install.ps1` winget install path (the test used a python.org
-  install) and the new `run-weekly.ps1` `.anthropic.env` reading. Verify on next Windows pass.
+- Verified end-to-end on real Windows (Win10/cp1250, Claude Code 2.1.185, Python 3.13, `dev`
+  branch): plugin loads, all hooks fire, weekly consolidation runs (manual + Task Scheduler),
+  and `run-weekly.ps1` reads the key from `.anthropic.env`.
+- Still unverified on Windows: the `install.ps1` winget INSTALL path (the test used a python.org
+  install), and interpreter detection on a box with no `py` launcher (the B1 fix targets exactly
+  that case). Verify on next Windows pass.
 
 ## [0.2.3] - 2026-06-11
 

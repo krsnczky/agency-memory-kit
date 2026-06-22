@@ -9,8 +9,9 @@
 #   3. Checks the optional anthropic package (only the weekly consolidate.py needs it).
 #   4. Prints the remaining setup steps.
 #
-# NOTE: provisional - the winget package id and the python launcher name on
-# Windows have not been verified on a real machine yet. Test before relying on it.
+# Verified on real Windows (Win10/cp1250, Python 3.13, py launcher). Still unverified:
+# the winget INSTALL path (the test used a python.org install), and detection on a box
+# where Python is reachable only as 'python'/'python3' with no 'py' launcher.
 #
 # The hooks are NOT wired here - they ship inside the plugin
 # (plugins\agency-memory\hooks\hooks.json) and activate when you install the
@@ -32,7 +33,9 @@ function Find-Python {
         try {
             $parts = $cmd.Split(" ")
             $exe = $parts[0]
-            $rest = $parts[1..($parts.Length - 1)]
+            # PowerShell: $parts[1..0] is a DESCENDING range for a single-token command,
+            # which wrongly returns the command name. Guard for the single-token case.
+            $rest = if ($parts.Length -gt 1) { $parts[1..($parts.Length - 1)] } else { @() }
             $ver = & $exe @rest -c "import sys; print(sys.version_info[0])" 2>$null
             if ($ver -eq "3") { return $cmd }
         } catch { }
@@ -67,7 +70,11 @@ if (-not $PyCmd) {
     }
 }
 
-$verStr = & ($PyCmd.Split(" ")[0]) @($PyCmd.Split(" ")[1..($PyCmd.Split(" ").Length - 1)]) --version 2>&1
+# $PyCmd may be multi-token ("py -3"); split into exe + arg array once and reuse below.
+$parts = $PyCmd.Split(" ")
+$exe = $parts[0]
+$rest = if ($parts.Length -gt 1) { $parts[1..($parts.Length - 1)] } else { @() }
+$verStr = & $exe @rest --version 2>&1
 Write-Host "[ok] Python 3 found:  $PyCmd  ($verStr)"
 
 # --- 2. The value to enter in the plugin config --------------------------------
@@ -77,8 +84,7 @@ Write-Host ">>> enter exactly:   $PyCmd"
 Write-Host ""
 
 # --- 3. anthropic package (only the weekly consolidate.py needs it) ------------
-$exe = $PyCmd.Split(" ")[0]
-$rest = $PyCmd.Split(" ")[1..($PyCmd.Split(" ").Length - 1)]
+# reuses $exe / $rest computed above
 & $exe @rest -c "import anthropic" 2>$null
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[ok] anthropic package found (consolidate.py ready)"
