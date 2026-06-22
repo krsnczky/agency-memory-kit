@@ -7,7 +7,7 @@
     {
       "name": "agency-memory",
       "source": "./plugins/agency-memory",
-      "description": "Per-client, no-mixing memory engine for an AI agency: deterministic context loading, weekly consolidation, and human-approved candidate review."
+      "description": "Per-client, no-mixing memory engine for agencies: deterministic context loading, weekly consolidation, and human-approved candidate review."
     }
   ]
 }
