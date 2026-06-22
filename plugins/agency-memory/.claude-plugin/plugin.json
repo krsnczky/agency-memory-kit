@@ -14,6 +14,5 @@
       "description": "The command that runs Python 3 on your machine. Usually 'python3' on macOS/Linux and 'python' on Windows. If unsure, run the bundled install script - it detects (or installs) Python and tells you exactly what to enter here.",
       "default": "python3"
     }
-  },
-  "hooks": "./hooks/hooks.json"
+  }
 }

@@ -16,14 +16,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Windows). All five hooks invoke `${user_config.python}`.
 - Per-OS install documentation in the README (bootstrap step, Python-command notes).
 
+### Fixed
+- **Windows plugin load failure (BLOCKER):** removed the `"hooks"` key from `plugin.json`.
+  Current Claude Code auto-loads `hooks/hooks.json`; declaring it again caused a "Duplicate
+  hooks file" hard load failure that disabled the whole plugin.
+- **Windows hook crash on non-UTF-8 locales (BLOCKER):** every entry script that prints
+  (5 hooks + `consolidate.py`, `client_candidates.py`, `candidates_nudge.py`) now forces
+  `sys.stdout/stderr` to UTF-8. On a cp1250 (etc.) console, emoji in hook output raised
+  `UnicodeEncodeError` and aborted the prompt; macOS/Linux default to UTF-8 so it was invisible there.
+
 ### Changed
 - World template `CLAUDE.md`: system/dev session logging now explicitly creates
   `system/logs/CHANGELOG.md` (and its folder) if it does not exist, instead of assuming it
   is already there.
+- `run-weekly.ps1`: reads `ANTHROPIC_API_KEY` from a `.anthropic.env` key file when the env var
+  is unset (parity with `run-weekly.sh`, keeps the key out of the registry), sets
+  `PYTHONUTF8=1`, and its header now carries a PowerShell `Register-ScheduledTask` recipe with
+  `-StartWhenAvailable` (launchd-style catch-up that `schtasks` can't set).
+- README: actionable Windows "Python on PATH" troubleshooting (use `python`/`py -3` not
+  `python3`; Microsoft Store alias-stub gotcha).
 
 ### Notes
-- Windows is **provisional**: the `install.ps1` winget id and the Windows Python launcher
-  name have not yet been verified end-to-end on a real machine. Verify before relying on it.
+- Windows blockers above were found on a real Windows 10 / cp1250 test (Claude Code 2.1.185,
+  Python 3.13). The weekly consolidation ran end-to-end (manual + Task Scheduler) once fixed.
+- Still unverified on Windows: the `install.ps1` winget install path (the test used a python.org
+  install) and the new `run-weekly.ps1` `.anthropic.env` reading. Verify on next Windows pass.
 
 ## [0.2.3] - 2026-06-11
 

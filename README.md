@@ -194,8 +194,9 @@ placeholders, none auto-installs):
   user timer. `Persistent=true` is the launchd equivalent: a missed run (machine off)
   fires on next boot. A plain-cron one-liner is in the timer template's header.
 - `run-weekly.ps1` - **Windows** PowerShell wrapper for Task Scheduler (the schedule +
-  catch-up note is in its header). Provisional: the cross-platform hooks are in place, but
-  Windows has not been end-to-end tested yet.
+  catch-up recipe is in its header). The weekly consolidation was verified end-to-end on
+  Windows (manual + Task Scheduler). It reads `ANTHROPIC_API_KEY` from a `.anthropic.env` key
+  file when the env var is unset (parity with `run-weekly.sh`).
 - `github-actions-consolidate.yml.template` - **any OS**, machine-independent cloud run.
   Trade-off: it checks out your world (client data) on a GitHub runner, so keep the world
   repo private, and do not make the cloud path your only path if the data is sensitive.
@@ -205,6 +206,14 @@ Windows with no bash dependency. The hook command uses whatever you entered at t
 command** config prompt on install (`python3` on macOS/Linux, `python` on Windows - the
 bootstrap script in step 0 prints the right value). To change it later, edit the plugin's
 config or re-run `/plugin`.
+
+**Windows: Python on PATH (read this if hooks fail to run).** The python.org installer creates
+`python.exe` and the `py` launcher but **no `python3.exe`** - so enter `python` (or `py -3`) at
+the Python command prompt, not `python3`. If `python`/`python3` open the Microsoft Store instead
+of running, you have the Store **alias stubs** ahead of real Python on PATH: turn them off under
+Settings -> Apps -> Advanced app settings -> App execution aliases (toggle off the Python
+entries), or remove the stub files in `%LOCALAPPDATA%\Microsoft\WindowsApps`. Verify with
+`python --version`.
 
 ## Structure
 

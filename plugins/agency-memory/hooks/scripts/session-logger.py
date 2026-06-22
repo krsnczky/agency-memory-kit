@@ -14,10 +14,19 @@ Changelog:
 """
 
 import os
+import sys
 import re
 import shutil
 from datetime import datetime
 from pathlib import Path
+
+# Windows / non-UTF-8 locales: emoji in stdout would crash (e.g. cp1250). Force UTF-8.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 
 
 def world_root():
