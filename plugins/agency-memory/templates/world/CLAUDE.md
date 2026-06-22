@@ -52,7 +52,7 @@ working on, so the info always lands in the right folder.
 3. `clients/[client]/memory/learnings.md` - append if there was a durable learning
 
 **System/dev session:**
-1. `system/logs/CHANGELOG.md` - append the change
+1. `system/logs/CHANGELOG.md` - append the change (create the file, and its `system/logs/` folder, if it does not exist)
 2. `system/memory/learnings.md` "Next session briefing" - update if the next session needs to know something (the SessionStart hook injects this automatically)
 
 Do this automatically at the end of every session. Do not ask whether to - just do it.

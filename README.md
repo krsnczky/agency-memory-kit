@@ -72,19 +72,17 @@ change.
 ## Requirements
 
 - Claude Code with plugin support
-- `python3` (the hooks and scripts use it)
+- Python 3 (the hooks and scripts use it). The plugin asks for the command name at install
+  time (the **Python command** config prompt) - usually `python3` on macOS/Linux, `python` on
+  Windows. Don't know if you have it? Run the bundled bootstrap script (below) - it detects or
+  installs Python and prints the exact value to enter.
 - `anthropic` Python package + `ANTHROPIC_API_KEY` - only for the weekly `consolidate.py`
   (since 0.2.0 it also runs the tool-craft judge and the cheap-Dreaming miner, which adds a
   small per-run cost that scales with how many sessions you had that week)
 
-### Upgrading from 0.1.x to 0.2.0
-
-The engine update brings the new scripts, the `PreToolUse` tool-craft guard, and the
-`tool-craft.md` template. Your existing world data is never overwritten, so the new
-`system/memory/tool-craft.md` is **seeded automatically** on your first weekly
-`consolidate.py` run after the update (the guard is a harmless no-op until it exists). No
-manual step. The guard ships in **WARN mode**: it warns, never blocks, until you explicitly
-promote a rule.
+> Upgrading from an earlier version? See [CHANGELOG.md](CHANGELOG.md) for what changed and any
+> upgrade notes. Your existing world data is never overwritten; new engine files are seeded on
+> your first weekly `consolidate.py` run after the update.
 
 ## Install
 
@@ -93,6 +91,20 @@ promote a rule.
 > `/plugin` commands, or the `claude plugin` CLI). The `/plugin` command is **not** available
 > in the VS Code / JetBrains extension UI - use the desktop app or a terminal. If `claude` is
 > not on your `PATH`, call it by its full path (commonly `~/.local/bin/claude`).
+
+**0. (Recommended) Run the bootstrap script first.** It checks for Python 3 (offers to
+install it via Homebrew/apt/winget if missing), then prints the exact value to type into the
+plugin's **Python command** prompt in step 1. Skip this only if you already know your Python
+command works.
+
+```bash
+# macOS / Linux - from the folder that contains your clone
+bash agency-memory-kit/install.sh
+```
+```powershell
+# Windows (PowerShell) - from inside your clone
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
 
 **1. Add the marketplace and enable the plugin.**
 
@@ -112,6 +124,10 @@ is rejected), so run it from the folder that *contains* your clone:
 claude plugin marketplace add ./agency-memory-kit    # or <owner/repo or git-url>
 claude plugin install agency-memory@agency-memory-kit
 ```
+
+During install the plugin asks for the **Python command** - enter the value the bootstrap
+script printed in step 0 (`python3` on macOS/Linux, `python` on Windows). This is the command
+the hooks use to run their scripts.
 
 **2. Mind the install scope.** Plugins install at `--scope user` by default = active in
 **every** Claude Code project you open. If you already run Claude Code in another repo that
@@ -178,15 +194,26 @@ placeholders, none auto-installs):
   user timer. `Persistent=true` is the launchd equivalent: a missed run (machine off)
   fires on next boot. A plain-cron one-liner is in the timer template's header.
 - `run-weekly.ps1` - **Windows** PowerShell wrapper for Task Scheduler (the schedule +
-  catch-up note is in its header). Provisional: the cross-platform hooks are in place, but
-  Windows has not been end-to-end tested yet.
+  catch-up recipe is in its header). The weekly consolidation was verified end-to-end on
+  Windows (manual + Task Scheduler). It reads `ANTHROPIC_API_KEY` from a `.anthropic.env` key
+  file when the env var is unset (parity with `run-weekly.sh`).
 - `github-actions-consolidate.yml.template` - **any OS**, machine-independent cloud run.
   Trade-off: it checks out your world (client data) on a GitHub runner, so keep the world
   repo private, and do not make the cloud path your only path if the data is sensitive.
 
 The daily hooks are all pure-Python (stdlib only), so they run on macOS, Linux, and
-Windows with no bash dependency. The only cross-platform caveat: the hook command uses
-`python3`; on Windows that name may be `python` (verify with `python3 --version`).
+Windows with no bash dependency. The hook command uses whatever you entered at the **Python
+command** config prompt on install (`python3` on macOS/Linux, `python` on Windows - the
+bootstrap script in step 0 prints the right value). To change it later, edit the plugin's
+config or re-run `/plugin`.
+
+**Windows: Python on PATH (read this if hooks fail to run).** The python.org installer creates
+`python.exe` and the `py` launcher but **no `python3.exe`** - so enter `python` (or `py -3`) at
+the Python command prompt, not `python3`. If `python`/`python3` open the Microsoft Store instead
+of running, you have the Store **alias stubs** ahead of real Python on PATH: turn them off under
+Settings -> Apps -> Advanced app settings -> App execution aliases (toggle off the Python
+entries), or remove the stub files in `%LOCALAPPDATA%\Microsoft\WindowsApps`. Verify with
+`python --version`.
 
 ## Structure
 

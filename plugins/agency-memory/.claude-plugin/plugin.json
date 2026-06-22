@@ -1,11 +1,18 @@
 {
   "name": "agency-memory",
   "displayName": "Agency Memory",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Per-client, no-mixing memory engine for an AI agency: deterministic context loading, weekly consolidation, human-approved candidate review, a self-improving tool-craft loop (mine recurring tool mistakes -> WARN gates), and cheap-Dreaming client-learning mining from raw transcripts.",
   "author": {
     "name": "Krusniczky Richárd"
   },
   "license": "MIT",
-  "hooks": "./hooks/hooks.json"
+  "userConfig": {
+    "python": {
+      "type": "string",
+      "title": "Python command",
+      "description": "The command that runs Python 3 on your machine. Usually 'python3' on macOS/Linux and 'python' on Windows. If unsure, run the bundled install script - it detects (or installs) Python and tells you exactly what to enter here.",
+      "default": "python3"
+    }
+  }
 }
