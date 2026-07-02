@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **World-configurable placeholders, footer and output language** (completes the i18n
+  genericization; found while dry-running a Hungarian world flip). Four new world-config keys
+  with English defaults in `world.default.json`: `placeholder_markers`, `placeholder`,
+  `footer_prefix`, `output_language`. Without these a non-English world silently corrupted
+  data: the world's footer line leaked into section bodies on rebuild (the English
+  `FOOTER_PREFIX` never matched), placeholder sections were mis-detected as content, and the
+  rebuilt file mixed languages.
+- LLM prompts (`consolidate.py` client + system, `dream_extractor.py` learnings,
+  `craft_judge.py` rules) now instruct the model to write generated content in the world's
+  `output_language`, so a non-English world gets learnings/rules in its own language
+  deterministically instead of whatever the model picks up from the transcript.
+
+### Fixed
+- **Non-English "Next session briefing" lost its verbatim protection:** the system
+  consolidation hardcoded `verbatim=("Next session briefing",)` instead of using the world's
+  `next_briefing_heading`, so on a non-English world the hand-curated briefing section would
+  have gone through the LLM instead of being preserved byte-for-byte. The consolidation
+  prompts' EVERGREEN/footer/briefing references were also hardcoded English section names;
+  they now come from the world config.
+
 ## [0.2.4] - 2026-06-22
 
 ### Added

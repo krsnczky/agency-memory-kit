@@ -29,10 +29,21 @@ import anthropic
 import transcript_lib as tl
 
 try:
-    from agency_common import resolve_world_root
+    from agency_common import resolve_world_root, load_world_config
 except Exception:
     def resolve_world_root(explicit=None):
         return explicit or os.environ.get("AGENCY_WORLD_ROOT") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+
+    def load_world_config(world_root):
+        return {}
+
+
+def _output_language():
+    """The world's output language for generated learnings (default English)."""
+    try:
+        return load_world_config(resolve_world_root()).get("output_language", "English")
+    except Exception:
+        return "English"
 
 TEXT_CHAR_CAP = 44000   # ~12k tokens of transcript text per session
 
@@ -53,7 +64,7 @@ NOT a learning: a one-off task step, a raw daily metric with no takeaway, a rest
 existing entry, speculation. If something is about a DIFFERENT client, SKIP it.
 
 For each learning output an object:
-  - "learning": one grounded sentence
+  - "learning": one grounded sentence, written in {language}
   - "true_as_of": the date this became true (YYYY-MM-DD) if the transcript shows it, else "unknown"
   - "confidence": "high" | "medium"
 
@@ -101,7 +112,8 @@ def mine(tdir, days=7, model="claude-opus-4-8"):
         lpath = cdir / main_c / "memory" / "learnings.md"
         learnings = lpath.read_text(encoding="utf-8") if lpath.exists() else "(no learnings.md)"
         prompt = PROMPT.format(client=main_c, today=today, learnings=learnings[:6000],
-                               n=len(text), trunc=trunc, text=text)
+                               n=len(text), trunc=trunc, text=text,
+                               language=_output_language())
         resp = client.messages.create(model=model, max_tokens=1200, system=SYSTEM,
                                       messages=[{"role": "user", "content": prompt}])
         tin += resp.usage.input_tokens
