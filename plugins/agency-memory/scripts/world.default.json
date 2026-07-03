@@ -36,6 +36,10 @@
     "Tried and rejected"
   ],
   "curated_prefix": "campaigns-",
+  "placeholder_markers": ["_No data", "_None yet", "_Empty"],
+  "placeholder": "_No data yet._",
+  "footer_prefix": "_Last updated",
+  "output_language": "English",
   "memory_guard": {
     "project_memory_path": null,
     "guards": []

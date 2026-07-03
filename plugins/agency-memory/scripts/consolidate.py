@@ -93,6 +93,7 @@ def configure(world_root):
     global CURATED_PREFIX, CURATED_GLOB
     global PROMOTION_CANDIDATES_PATH, SWEEP_CANDIDATES_PATH, WIKI_PROMOTION_CANDIDATES_PATH
     global CROSS_CLIENT_PATH, CANDIDATES_STATE_PATH
+    global _PLACEHOLDER_MARKERS, PLACEHOLDER, FOOTER_PREFIX, OUTPUT_LANGUAGE, NEXT_BRIEFING_HEADING
 
     REPO_ROOT = Path(world_root)
     CLIENTS_DIR = REPO_ROOT / "clients"
@@ -105,6 +106,11 @@ def configure(world_root):
     EVERGREEN_SECTIONS = cfg["evergreen_sections"]
     CURATED_PREFIX = cfg["curated_prefix"]
     CURATED_GLOB = f"{CURATED_PREFIX}*.md"
+    _PLACEHOLDER_MARKERS = tuple(cfg["placeholder_markers"])
+    PLACEHOLDER = cfg["placeholder"]
+    FOOTER_PREFIX = cfg["footer_prefix"]
+    OUTPUT_LANGUAGE = cfg["output_language"]
+    NEXT_BRIEFING_HEADING = cfg["next_briefing_heading"]
 
     mem = REPO_ROOT / "system" / "memory"
     PROMOTION_CANDIDATES_PATH = mem / "promotion-candidates.md"
@@ -113,9 +119,18 @@ def configure(world_root):
     CROSS_CLIENT_PATH = mem / "cross-client-patterns.md"
     CANDIDATES_STATE_PATH = mem / "candidates-state.json"
 
+# English defaults; configure() overrides all of these from the world config so a
+# non-English world's placeholders/footer/output language are honored (data integrity:
+# a mismatched footer prefix would leak footers into section bodies on rebuild).
 _PLACEHOLDER_MARKERS = ("_No data", "_None yet", "_Empty")
 
 PLACEHOLDER = "_No data yet._"
+
+FOOTER_PREFIX = "_Last updated"
+
+OUTPUT_LANGUAGE = "English"
+
+NEXT_BRIEFING_HEADING = "Next session briefing"
 
 
 def extract_bullets(text):
@@ -126,9 +141,6 @@ def extract_bullets(text):
         if s.startswith("- ") and not any(m in s for m in _PLACEHOLDER_MARKERS):
             out.append(s)
     return out
-
-
-FOOTER_PREFIX = "_Last updated"
 
 
 def split_sections(text):
@@ -197,7 +209,9 @@ def rebuild_learnings(llm_output, original, sections, today, verbatim=(), protec
                 body = _reinject_dropped(orig_body, body)
         parts.append(f"## {s}\n\n{body if body else PLACEHOLDER}\n")
         parts.append("---\n")
-    parts.append(f"_Last updated: {today} | Session: weekly-consolidation_")
+    # Footer derived from FOOTER_PREFIX so _clean_body strips it on the next run
+    # regardless of the world's language.
+    parts.append(f"{FOOTER_PREFIX}: {today} | Session: weekly-consolidation_")
     return "\n".join(parts)
 
 
@@ -344,19 +358,20 @@ Consolidation tasks:
    - NOT a learning (skip it): a one-off event, a raw daily metric with no takeaway, a rewording of an existing entry, speculation.
    - GROUNDING REQUIRED: only write it down if a concrete log.md entry (date/event) supports it. With no concrete log evidence, do NOT write it.
    - If there is no genuine learning at all: add nothing.
-4. STRUCTURE: keep the 6 sections. NO per-section entry cap - keep every genuinely useful entry. If the file grows past ~500 lines, prioritize more aggressive dedup/merge to compress (but do NOT drop content just for size).
+4. STRUCTURE: keep the {len(SECTIONS)} sections. NO per-section entry cap - keep every genuinely useful entry. If the file grows past ~500 lines, prioritize more aggressive dedup/merge to compress (but do NOT drop content just for size).
 5. FORMAT: each entry prefixed with "- ", with a date if relevant
 
 Sections:
 {sections_str}
 
 IMPORTANT RULES:
+- Write ALL content in {OUTPUT_LANGUAGE} (the language of the existing entries) - never switch language
 - Return only the learnings.md content, nothing else
-- Keep the header and the footer (Last updated line)
+- Keep the header and the footer (the "{FOOTER_PREFIX.lstrip('_')}" line)
 - If a section has no data, keep the "{PLACEHOLDER}" placeholder
 - Agency-general: PPC, SEO, creative, email, strategy, pricing all belong here
-- EVERGREEN sections ("Client preferences", "Tried and rejected"): merge only TRUE duplicates, NEVER drop a unique learning
-- The footer Last updated line should be: {TODAY} | Session: weekly-consolidation
+- EVERGREEN sections ({", ".join(f'"{s}"' for s in EVERGREEN_SECTIONS)}): merge only TRUE duplicates, NEVER drop a unique learning
+- The footer line should be: {FOOTER_PREFIX.lstrip('_')}: {TODAY} | Session: weekly-consolidation
 - NEVER delete a genuinely useful entry just because it is old"""
 
     client_api = anthropic.Anthropic()
@@ -439,19 +454,20 @@ Consolidation tasks:
    - NOT a learning (skip it): a one-off event, a raw commit description with no takeaway, a rewording of an existing entry, speculation.
    - GROUNDING REQUIRED: only write it down if a concrete CHANGELOG entry (date/tag) supports it. With no concrete evidence, do NOT write it.
    - If there is no genuine learning at all: add nothing.
-4. STRUCTURE: keep the 6 sections. NO per-section entry cap - keep every genuinely useful entry. If the file grows past ~500 lines, prioritize more aggressive dedup/merge to compress (but do NOT drop content just for size).
+4. STRUCTURE: keep the {len(SYSTEM_SECTIONS)} sections. NO per-section entry cap - keep every genuinely useful entry. If the file grows past ~500 lines, prioritize more aggressive dedup/merge to compress (but do NOT drop content just for size).
 5. FORMAT: each entry prefixed with "- ", with a date if relevant
 
 Sections:
 {sections_str}
 
 IMPORTANT RULES:
+- Write ALL content in {OUTPUT_LANGUAGE} (the language of the existing entries) - never switch language
 - Return only the learnings.md content, nothing else
-- Keep the header and the footer (Last updated line)
+- Keep the header and the footer (the "{FOOTER_PREFIX.lstrip('_')}" line)
 - If a section has no data, keep the "{PLACEHOLDER}" placeholder
-- Do NOT modify the "Next session briefing" section - it is the live hand-curated handoff; leave it empty, the script preserves it verbatim
-- EVERGREEN sections (architecture, workflow, tooling, dev decisions, tried-and-rejected): merge only TRUE duplicates, NEVER drop a unique learning
-- The footer Last updated line should be: {TODAY} | Session: weekly-consolidation
+- Do NOT modify the "{NEXT_BRIEFING_HEADING}" section - it is the live hand-curated handoff; leave it empty, the script preserves it verbatim
+- EVERGREEN sections ({", ".join(f'"{s}"' for s in PROTECTED_SYSTEM_SECTIONS)}): merge only TRUE duplicates, NEVER drop a unique learning
+- The footer line should be: {FOOTER_PREFIX.lstrip('_')}: {TODAY} | Session: weekly-consolidation
 - NEVER delete a genuinely useful entry just because it is old"""
 
     client_api = anthropic.Anthropic()
@@ -471,7 +487,7 @@ IMPORTANT RULES:
     # (live handoff injected by the SessionStart hook - NOT consolidated).
     consolidated = rebuild_learnings(
         consolidated, learnings, SYSTEM_SECTIONS, TODAY,
-        verbatim=("Next session briefing",),
+        verbatim=(NEXT_BRIEFING_HEADING,),
         protected=PROTECTED_SYSTEM_SECTIONS,
     )
 

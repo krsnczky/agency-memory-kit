@@ -27,6 +27,22 @@ import anthropic
 import craft_detector as cd
 import transcript_lib as tl
 
+try:
+    from agency_common import resolve_world_root, load_world_config
+except Exception:
+    resolve_world_root = None
+    load_world_config = None
+
+
+def _output_language():
+    """The world's output language for generated rules (default English)."""
+    try:
+        if resolve_world_root and load_world_config:
+            return load_world_config(resolve_world_root()).get("output_language", "English")
+    except Exception:
+        pass
+    return "English"
+
 SYSTEM = ("You are the tool-craft analyzer of an agency's AI system (Claude Code running a "
           "marketing/ops agency: clients, ads platforms, CRM/Notion, scraping, file ops). You "
           "receive RECURRING tool failures and user-rejections that a mechanical detector "
@@ -52,6 +68,7 @@ For each REAL lesson output an object:
   - "scope": if enforceable, the condition ("when <X>"); else "advisory"
   - "evidence": "<count>x / <sessions> sessions"
 
+Write each "rule" sentence in {language}; keep tool names and the "scope" condition as-is.
 Skip clusters that are NOT lessons (do not output them). Output ONLY a JSON array, nothing else.
 
 CLUSTERS:
@@ -91,7 +108,8 @@ def judge(tdir, days=24, min_sessions=2, model="claude-opus-4-8"):
         return [], None
     resp = anthropic.Anthropic().messages.create(
         model=model, max_tokens=2000, system=SYSTEM,
-        messages=[{"role": "user", "content": PROMPT.format(clusters=build_clusters_block(keep))}],
+        messages=[{"role": "user", "content": PROMPT.format(clusters=build_clusters_block(keep),
+                                                            language=_output_language())}],
     )
     return parse_json_array(resp.content[0].text), resp.usage
 
