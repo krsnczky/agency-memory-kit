@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-07-03
+
 ### Added
 - **No-mixing guard on the agent write path** (memory-guard hook): writing under
   `clients/<X>/` with content that mentions ANOTHER known client triggers a WARN via
