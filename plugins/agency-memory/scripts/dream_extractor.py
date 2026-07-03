@@ -65,6 +65,12 @@ existing entry, speculation. If something is about a DIFFERENT client, SKIP it.
 
 For each learning output an object:
   - "learning": one grounded sentence, written in {language}
+  - "type": exactly one of:
+      "decision"  - a choice that was made and why (it holds until revisited)
+      "gotcha"    - a trap, constraint or failure mode discovered
+      "result"    - a measured outcome that generalizes (a baseline, a what-works)
+      "rule"      - a standing preference or how-to for this client
+      "learning"  - any other durable insight that fits none of the above
   - "true_as_of": the date this became true (YYYY-MM-DD) if the transcript shows it, else "unknown"
   - "confidence": "high" | "medium"
 
@@ -131,20 +137,29 @@ def mine(tdir, days=7, model="claude-opus-4-8"):
     return rows, tin, tout
 
 
+OBS_TYPES = ("decision", "gotcha", "result", "rule", "learning")
+
+
 def candidates(tdir, days=7, model="claude-opus-4-8"):
-    """Client-learning candidates in the {type, scope, text} shape. LEAK candidates (mention
-    another client) are DROPPED, not queued - no-mixing safety over recall."""
+    """Client-learning candidates in the {type, scope, text} shape (+ obs_type taxonomy:
+    decision/gotcha/result/rule/learning - speeds up review, can steer where an accept
+    lands). LEAK candidates (mention another client) are DROPPED, not queued - no-mixing
+    safety over recall."""
     rows, _, _ = mine(tdir, days, model)
     out = []
     for client, it, leak in rows:
         if leak:
             continue
         date = it.get("true_as_of", "unknown")
-        out.append({
+        cand = {
             "type": "client-learning", "scope": client,
             "text": f"[as of: {date}] {it.get('learning','').strip()}",
             "true_as_of": date, "confidence": it.get("confidence", "?"),
-        })
+        }
+        obs = str(it.get("type", "")).strip().lower()
+        if obs in OBS_TYPES:
+            cand["obs_type"] = obs
+        out.append(cand)
     return out
 
 

@@ -1,8 +1,19 @@
 # Context Load Order
 
-_Mandatory load order per task type. Injected before every prompt by the UserPromptSubmit hook._
+_Mandatory load order per task type._
 _If a required file does not exist for a client: flag it, do not silently skip._
 _Edit the task table below to match your agency's work. The rows are examples._
+
+_Injection (progressive disclosure): the short block between the prompt-reminder markers below
+is injected before EVERY prompt; the full file is injected once per session start (and again
+after compaction). If you remove the markers, the full file is injected on every prompt instead._
+
+<!-- prompt-reminder:start -->
+**Context load order - short reminder** (full table injected at session start: `system/memory/context-load-order.md`):
+- Before any client task, base load: `clients/[client]/.claude/CLAUDE.md` -> `wiki/index.md` -> `wiki/hot.md` -> `memory/learnings.md` (full), then surface open memory candidates for that client (`client_candidates.py [client]`)
+- Task additions: see the task table (strategy -> profil + cross-client patterns | copy -> brand.md | competitor -> competitors/index.md | reporting -> campaigns + change-log)
+- Missing required file -> flag it; unidentifiable client -> ask, load nothing
+<!-- prompt-reminder:end -->
 
 ---
 

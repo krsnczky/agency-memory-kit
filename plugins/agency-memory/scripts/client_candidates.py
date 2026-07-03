@@ -12,6 +12,8 @@ Changelog:
   2026-06-03 - Plugin conversion: STATE_PATH via agency_common world-root.
   2026-06-08 - Added the client-learning type to CLIENT_TYPES (the dream_extractor v2 stream
                was missing from point-of-use surfacing - found during beta review).
+  2026-07-03 - Show the obs_type taxonomy tag (decision/gotcha/result/rule/learning) on
+               client-learning candidates when present.
 """
 
 import json
@@ -73,7 +75,8 @@ def main():
     if learn:
         print("  CLIENT-LEARNING (durable learning from the transcript -> memory/learnings.md):")
         for c in learn:
-            print(f"    #{c['id']} ({_age(c)}) {c['text']}")
+            obs = f" [{c['obs_type']}]" if c.get("obs_type") else ""
+            print(f"    #{c['id']} ({_age(c)}){obs} {c['text']}")
     if wiki:
         print("  WIKI-PROMOTION (durable account fact -> campaigns-<area>.md):")
         for c in wiki:

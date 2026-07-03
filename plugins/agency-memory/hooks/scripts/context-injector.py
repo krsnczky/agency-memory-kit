@@ -2,8 +2,12 @@
 """
 context-injector.py
 Purpose: UserPromptSubmit hook - two jobs:
-  1. Injects the contents of <world>/system/memory/context-load-order.md before
-     every prompt.
+  1. Injects the context-load-order reminder before every prompt. If the world's
+     context-load-order.md contains a marked prompt-reminder block
+     (<!-- prompt-reminder:start --> ... <!-- prompt-reminder:end -->), only that
+     SHORT block is injected per prompt (progressive disclosure - the full table
+     is injected once per session by system-briefing.py, incl. after compaction).
+     Without markers the FULL file is injected (backward compatible).
   2. Detects compact commands and injects compact-protocol.md.
 Trigger: UserPromptSubmit
 Changelog:
@@ -11,6 +15,9 @@ Changelog:
   2026-05-27 - Compact detection added
   2026-05-31 - Extracted to agency-memory-kit; removed dead kgraph fallback line
   2026-06-03 - Plugin conversion: paths via agency_common world-root (not cwd)
+  2026-07-03 - Progressive disclosure: per-prompt injection shrinks to the marked
+               prompt-reminder block when the world provides one; the full table
+               moved to SessionStart (system-briefing.py).
 """
 
 import json
@@ -41,12 +48,27 @@ COMPACT_KEYWORDS = [
 ]
 
 
+REMINDER_START = "<!-- prompt-reminder:start -->"
+REMINDER_END = "<!-- prompt-reminder:end -->"
+
+
 def read_file(path):
     try:
         with open(path, encoding="utf-8") as f:
             return f.read().strip()
     except Exception:
         return None
+
+
+def prompt_reminder(content):
+    """The marked short block if the world provides one, else the full content."""
+    start = content.find(REMINDER_START)
+    end = content.find(REMINDER_END)
+    if start != -1 and end > start:
+        block = content[start + len(REMINDER_START):end].strip()
+        if block:
+            return block, True
+    return content, False
 
 
 def main():
@@ -75,10 +97,12 @@ Before the compact runs, save session memory:
 THEN run the compact.
 """)
 
-    # 2. Context load order injection (always)
+    # 2. Context load order injection (always; short block when the world marks one)
     content = read_file(CONTEXT_LOAD_ORDER)
     if content:
-        print(f"\n📋 CONTEXT LOAD ORDER (system/memory/context-load-order.md)\n{content}\n")
+        block, is_short = prompt_reminder(content)
+        note = " - short reminder; full table injected at session start" if is_short else ""
+        print(f"\n📋 CONTEXT LOAD ORDER (system/memory/context-load-order.md{note})\n{block}\n")
 
     sys.exit(0)
 

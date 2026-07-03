@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-07-03
+
+Silent-failure hardening + review-cycle quality-of-life round (sourced from the first
+production world's infra audit; every item was verified against live hook behavior).
+
+### Fixed
+- **memory-guard warnings were invisible to the model** - the PreToolUse hook printed to
+  plain stdout with exit 0, which Claude Code does not surface. Warnings now go through
+  `hookSpecificOutput.additionalContext` (same pattern as tool_craft_guard). The hook had
+  been a silent no-op since its first version.
+- **A failed transcript-mining (Dreaming) run was silent** and its week of learnings aged
+  out of the window for good. Now: the dream window is 10 days (weekly cadence + overlap,
+  one missed run no longer loses data), the failure is recorded in
+  `candidates-state.json["last_run"]`, and `candidates_nudge` warns at session start.
+- **Truncated consolidation output went undetected**: `stop_reason == "max_tokens"` is now
+  checked on both consolidation calls; the write is skipped and the original file kept.
+- **The client next-briefing section was consolidated** (system-only verbatim before); a
+  world that keeps a hand-curated briefing section in client files no longer loses it to
+  the LLM pass.
+- `candidates_nudge` crashed (swallowed traceback -> nudge silently missing) on a candidate
+  with missing `type`/`scope` keys; all state access is now `.get()`-safe in the nudge,
+  `write_review_files` and `_find_match`, and an unexpected nudge error prints one visible
+  line into the briefing instead of vanishing. The nudge subprocess also runs with
+  `sys.executable` (the configured plugin python) instead of a hardcoded `python3`.
+
+### Added
+- **Progressive disclosure for the per-prompt context injection**: if the world's
+  `context-load-order.md` contains a `<!-- prompt-reminder:start/end -->` block, only that
+  short block is injected per prompt; the FULL table is injected once per session start by
+  system-briefing (SessionStart fires on compaction too, so the full table survives
+  compaction). Without markers the behavior is unchanged (full file per prompt). The world
+  template ships the marker block.
+- **tool-craft Advisory delivery**: the approved Advisory section of `tool-craft.md` is now
+  injected at session start (previously the advisory lessons were approved into the file
+  but nothing ever delivered them to the model - the enforceable table was machine-read,
+  the advisory list was dead).
+- **WARN->DENY escalation surfacing**: `candidates_nudge` reads
+  `tool-craft-violations.json` and flags rules hit >= 5 times as DENY-ripe (the escalation
+  counter finally has a consumer).
+- **`consolidate.py --reviews-only`**: regenerate the review .md files from
+  `candidates-state.json` with no API calls - run it after accept/reject so the .md
+  snapshots do not go stale; the review-file headers now state that the state file is the
+  source of truth.
+- **Observation taxonomy (`obs_type`)**: dream-mined client learnings are typed
+  (decision / gotcha / result / rule / learning), carried through the candidate state and
+  shown in review files and point-of-use surfacing - faster review, and the type can steer
+  where an accepted learning lands.
+
+### Changed
+- `candidates_nudge` counts `client-learning` candidates as client-scoped (consistent with
+  point-of-use surfacing in `client_candidates.py`); they were previously lumped into the
+  "global" count.
+
 ## [0.2.5] - 2026-07-03
 
 ### Added
