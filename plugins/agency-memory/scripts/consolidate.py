@@ -106,6 +106,7 @@ def configure(world_root):
     global PROMOTION_CANDIDATES_PATH, SWEEP_CANDIDATES_PATH, WIKI_PROMOTION_CANDIDATES_PATH
     global CROSS_CLIENT_PATH, CANDIDATES_STATE_PATH
     global _PLACEHOLDER_MARKERS, PLACEHOLDER, FOOTER_PREFIX, OUTPUT_LANGUAGE, NEXT_BRIEFING_HEADING
+    global BRIEFING_KEEP_CHECKPOINTS, BRIEFING_BLOCK_REGEX
 
     REPO_ROOT = Path(world_root)
     CLIENTS_DIR = REPO_ROOT / "clients"
@@ -123,6 +124,12 @@ def configure(world_root):
     FOOTER_PREFIX = cfg["footer_prefix"]
     OUTPUT_LANGUAGE = cfg["output_language"]
     NEXT_BRIEFING_HEADING = cfg["next_briefing_heading"]
+    # Briefing retention (#6): 0 = off (default, backward compatible). N>0: the weekly
+    # system consolidation keeps only the newest N checkpoint blocks in the next-briefing
+    # section and sweeps the rest to system/memory/archive/briefing-archive.md. Without
+    # this the verbatim-protected briefing is a one-way valve - it only ever grows.
+    BRIEFING_KEEP_CHECKPOINTS = int(cfg.get("briefing_keep_checkpoints", 0) or 0)
+    BRIEFING_BLOCK_REGEX = cfg.get("briefing_block_regex", r"^\*\*[^\n]*CHECKPOINT")
 
     mem = REPO_ROOT / "system" / "memory"
     PROMOTION_CANDIDATES_PATH = mem / "promotion-candidates.md"
@@ -436,6 +443,44 @@ IMPORTANT RULES:
     return True
 
 
+def apply_briefing_retention(text, archive_path, dry_run=False):
+    """#6: trim the next-briefing section to the newest BRIEFING_KEEP_CHECKPOINTS blocks
+    (blocks are newest-first by convention); swept blocks are APPENDED to the archive
+    file, never deleted. Intro lines before the first checkpoint marker are kept.
+    No-op when retention is off (0), the section is missing, or there is nothing over
+    the limit. Runs AFTER rebuild_learnings, so it operates on the verbatim-preserved
+    section."""
+    if BRIEFING_KEEP_CHECKPOINTS <= 0:
+        return text
+    lines = text.split("\n")
+    try:
+        h = next(i for i, l in enumerate(lines)
+                 if l.startswith("## ") and l[3:].strip() == NEXT_BRIEFING_HEADING)
+    except StopIteration:
+        return text
+    end = h + 1
+    while end < len(lines) and lines[end].strip() != "---" and not lines[end].startswith("## "):
+        end += 1
+    body = "\n".join(lines[h + 1:end])
+    starts = [m.start() for m in re.finditer(BRIEFING_BLOCK_REGEX, body, re.M)]
+    if len(starts) <= BRIEFING_KEEP_CHECKPOINTS:
+        return text
+    cut = starts[BRIEFING_KEEP_CHECKPOINTS]
+    kept = body[:cut].rstrip("\n")
+    swept = body[cut:].strip()
+    n_swept = len(starts) - BRIEFING_KEEP_CHECKPOINTS
+    if dry_run:
+        print(f"  [briefing-retention] dry-run: would sweep {n_swept} old checkpoint block(s) to {archive_path.name}")
+        return text
+    if swept:
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(archive_path, "a", encoding="utf-8") as f:
+            f.write(f"\n\n## Swept from the next-briefing section | {TODAY}\n\n{swept}\n")
+    print(f"  [briefing-retention] {n_swept} old checkpoint block(s) swept to {archive_path.name} "
+          f"(kept: newest {BRIEFING_KEEP_CHECKPOINTS})")
+    return "\n".join(lines[:h + 1] + kept.split("\n") + [""] + lines[end:])
+
+
 def consolidate_system(dry_run=False):
     """Consolidate system/memory/learnings.md against the CHANGELOG.md."""
     learnings_path = REPO_ROOT / "system" / "memory" / "learnings.md"
@@ -512,6 +557,14 @@ IMPORTANT RULES:
         consolidated, learnings, SYSTEM_SECTIONS, TODAY,
         verbatim=(NEXT_BRIEFING_HEADING,),
         protected=PROTECTED_SYSTEM_SECTIONS,
+    )
+
+    # Briefing retention (#6): verbatim protects the section from the LLM; this trims
+    # it deterministically so it does not grow without bound.
+    consolidated = apply_briefing_retention(
+        consolidated,
+        REPO_ROOT / "system" / "memory" / "archive" / "briefing-archive.md",
+        dry_run=dry_run,
     )
 
     if dry_run:

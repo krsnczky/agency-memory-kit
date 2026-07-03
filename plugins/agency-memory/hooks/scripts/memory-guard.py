@@ -18,10 +18,18 @@ Changelog:
                exit 0 - the hook was a silent no-op. Warnings now go through
                hookSpecificOutput.additionalContext (same pattern as
                tool_craft_guard.py).
+  2026-07-03 - No-mixing guard on the AGENT write path: writing under
+               clients/<X>/ with content that mentions ANOTHER known client
+               triggers a WARN. The machine gate existed only on the
+               transcript-mining path (dream_extractor leak check); the primary
+               path - the agent writing a client's memory at session end - was
+               convention-only. Automatic when <world>/clients/ exists; no
+               config needed.
 """
 
 import json
 import os
+import re
 import sys
 
 # Windows / non-UTF-8 locales: emoji in stdout would crash (e.g. cp1250). Force UTF-8.
@@ -40,6 +48,39 @@ from agency_common import (  # noqa: E402
     load_world_config,
     default_project_memory_path,
 )
+
+
+def no_mixing_warning(world, file_path, tool_input):
+    """WARN when a write under clients/<X>/ mentions another known client by name.
+    file_path arrives lowercased. WARN-only: legit cross-client references exist
+    (e.g. a comparison note), but they must be a conscious choice, never an accident."""
+    clients_dir = world / "clients"
+    if not clients_dir.is_dir():
+        return None
+    m = re.search(r"/clients/([^/]+)/", file_path)
+    if not m:
+        return None
+    target = m.group(1)
+    try:
+        known = {d.name.lower() for d in clients_dir.iterdir()
+                 if d.is_dir() and not d.name.startswith((".", "_"))}
+    except Exception:
+        return None
+    if target not in known:
+        return None
+    content = " ".join(
+        str(tool_input.get(k, "")) for k in ("content", "new_string")
+    ).lower()
+    if not content:
+        return None
+    hits = sorted(c for c in known - {target}
+                  if c in content or c.replace("-", " ") in content)
+    if not hits:
+        return None
+    return (f"⚠️ NO-MIXING GUARD: you are writing under clients/{target}/ but the "
+            f"content mentions other known client(s): {', '.join(hits)}. Client info "
+            f"must NEVER land in another client's folder - verify this reference is "
+            f"intentional before proceeding.")
 
 
 def load_memory(memory_dir, filename):
@@ -78,27 +119,32 @@ def main():
     config = load_world_config(world)
     mg = config.get("memory_guard", {}) or {}
     guards = mg.get("guards", []) or []
-    if not guards:
-        sys.exit(0)  # no guards configured for this world -> no-op
-
-    configured_path = mg.get("project_memory_path")
-    if configured_path:
-        memory_dir = Path(os.path.expanduser(configured_path))
-    else:
-        memory_dir = default_project_memory_path(world)
 
     warnings = []
-    for guard in guards:
-        patterns = guard.get("patterns", [])
-        if not any(pat.lower() in file_path for pat in patterns):
-            continue
-        for mem_file in guard.get("memories", []):
-            content = load_memory(memory_dir, mem_file)
-            if content:
-                label = guard.get("label", "")
-                warnings.append(
-                    f"🧠 MEMORY GUARD [{label}] - {mem_file}\n{content}"
-                )
+
+    # No-mixing check: config-free, runs whenever the world has a clients/ dir
+    mix = no_mixing_warning(world, file_path, tool_input)
+    if mix:
+        warnings.append(mix)
+
+    if guards:
+        configured_path = mg.get("project_memory_path")
+        if configured_path:
+            memory_dir = Path(os.path.expanduser(configured_path))
+        else:
+            memory_dir = default_project_memory_path(world)
+
+        for guard in guards:
+            patterns = guard.get("patterns", [])
+            if not any(pat.lower() in file_path for pat in patterns):
+                continue
+            for mem_file in guard.get("memories", []):
+                content = load_memory(memory_dir, mem_file)
+                if content:
+                    label = guard.get("label", "")
+                    warnings.append(
+                        f"🧠 MEMORY GUARD [{label}] - {mem_file}\n{content}"
+                    )
 
     if warnings:
         # PreToolUse: exit-0 stdout is NOT surfaced to the model - the warning
