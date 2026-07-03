@@ -14,6 +14,10 @@ Changelog:
   2026-05-27 - Portability: hardcoded paths -> dynamic paths
   2026-06-03 - Plugin conversion: GUARDS + project path moved to world config;
                mechanism stays generic.
+  2026-07-03 - FIX: plain-stdout output is INVISIBLE to the model on PreToolUse
+               exit 0 - the hook was a silent no-op. Warnings now go through
+               hookSpecificOutput.additionalContext (same pattern as
+               tool_craft_guard.py).
 """
 
 import json
@@ -93,11 +97,19 @@ def main():
             if content:
                 label = guard.get("label", "")
                 warnings.append(
-                    f"🧠 MEMORY GUARD [{label}] — {mem_file}\n{content}"
+                    f"🧠 MEMORY GUARD [{label}] - {mem_file}\n{content}"
                 )
 
     if warnings:
-        print("\n" + "\n\n".join(warnings) + "\n")
+        # PreToolUse: exit-0 stdout is NOT surfaced to the model - the warning
+        # MUST go through the hookSpecificOutput JSON (see tool_craft_guard.py).
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "additionalContext": "\n\n".join(warnings),
+            }
+        }))
 
     sys.exit(0)
 

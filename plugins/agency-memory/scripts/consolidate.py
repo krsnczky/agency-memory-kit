@@ -41,6 +41,18 @@ Changelog:
                  files (separate stream from promotion: a GENERAL rule -> CLAUDE.md, an
                  account FACT -> wiki). Runs only for clients that keep curated per-area
                  files; gets the curated content so it never proposes a duplicate.
+  2026-07-03 - Silent-failure hardening + review-cycle QoL:
+               * stop_reason==max_tokens is detected on both consolidation calls: the
+                 write is skipped and the original kept (no silent truncation).
+               * Client next-briefing section is verbatim too (was system-only).
+               * detect_new_extractors: dream window 7->10 days (overlap: one missed
+                 weekly run no longer loses that week for good) + failure recorded in
+                 state["last_run"] -> candidates_nudge warns at session start.
+               * --reviews-only: regenerate review .md files from state with no API
+                 (run after accept/reject so the .md snapshots do not go stale);
+                 review-file headers state that candidates-state.json is the truth.
+               * obs_type taxonomy (decision/gotcha/result/rule/learning) carried
+                 through sync_candidates and shown in review files.
 """
 
 import argparse
@@ -386,11 +398,18 @@ IMPORTANT RULES:
         print(f"  [{client_dir_name}] API error: {e}")
         return False
 
+    if response.stop_reason == "max_tokens":
+        print(f"  [{client_dir_name}] TRUNCATED output (max_tokens hit) - write skipped, original kept")
+        return False
+
     consolidated = response.content[0].text.strip()
 
     # Deterministic rebuild: fixed schema, missing/empty section -> original fallback.
     # protected= : in protected sections a dropped unique bullet is re-injected (weekly lossless).
+    # The next-briefing section (if this world has it in client files) is a hand-curated
+    # handoff - verbatim, same as the system file.
     consolidated = rebuild_learnings(consolidated, learnings, SECTIONS, TODAY,
+                                     verbatim=(NEXT_BRIEFING_HEADING,),
                                      protected=PROTECTED_SECTIONS)
 
     if dry_run:
@@ -479,6 +498,10 @@ IMPORTANT RULES:
         )
     except Exception as e:
         print(f"  [system] API error: {e}")
+        return False
+
+    if response.stop_reason == "max_tokens":
+        print(f"  [system] TRUNCATED output (max_tokens hit) - write skipped, original kept")
         return False
 
     consolidated = response.content[0].text.strip()
@@ -648,7 +671,7 @@ Rules:
                f"_Regenerated weekly by consolidate.py. Recurring tactics, pitfalls, and "
                f"vertical patterns across multiple clients - what the siloed client folders "
                f"cannot see. Your agency's internal strategic memory, NOT a client data store._\n\n"
-               f"_Last run: {TODAY}_\n\n---\n\n{body}\n")
+               f"_Last run: {TODAY} | candidates-state.json is the source of truth - this file is a snapshot; after accept/reject refresh with `consolidate.py --reviews-only`_\n\n---\n\n{body}\n")
     CROSS_CLIENT_PATH.write_text(content, encoding="utf-8")
     print(f"  [cross-client] OK - patterns -> {CROSS_CLIENT_PATH.relative_to(REPO_ROOT)}")
     return True
@@ -826,7 +849,7 @@ def _find_match(detected, candidates):
     """Existing candidate that is the same as the detected one (same type+scope, symmetric token overlap)."""
     dtok = _tokens(detected["text"])
     for c in candidates:
-        if c["type"] == detected["type"] and c["scope"] == detected["scope"] and _same_candidate(dtok, _tokens(c["text"])):
+        if c.get("type") == detected["type"] and c.get("scope") == detected["scope"] and _same_candidate(dtok, _tokens(c.get("text", ""))):
             return c
     return None
 
@@ -835,17 +858,24 @@ def sync_candidates(detected, state):
     """Merge freshly detected candidates into the state:
     - existing (any status) match -> last_seen updated, first_seen/status kept (rejected does NOT return to open)
     - new -> id, first_seen=today, status=open
-    Open candidates not re-detected this run are kept (waiting for review; LLM non-determinism does not drop them)."""
+    Open candidates not re-detected this run are kept (waiting for review; LLM non-determinism does not drop them).
+    obs_type (observation taxonomy: decision/gotcha/result/rule/learning) is carried when the
+    extractor provides it - it speeds up review and can steer where an accept lands."""
     for d in detected:
         m = _find_match(d, state["candidates"])
         if m:
             m["last_seen"] = TODAY
             m["text"] = d["text"]  # freshest wording, but identity/status stay
+            if d.get("obs_type"):
+                m["obs_type"] = d["obs_type"]
         else:
-            state["candidates"].append({
+            entry = {
                 "id": state["next_id"], "type": d["type"], "scope": d["scope"],
                 "text": d["text"], "first_seen": TODAY, "last_seen": TODAY, "status": "open",
-            })
+            }
+            if d.get("obs_type"):
+                entry["obs_type"] = d["obs_type"]
+            state["candidates"].append(entry)
             state["next_id"] += 1
     return state
 
@@ -860,20 +890,21 @@ def _weeks_since(date_str):
 
 def write_review_files(state):
     """Write the open candidates into the review .md files (promotion / sweep / wiki-promotion), with id + age."""
-    opens = [c for c in state["candidates"] if c["status"] == "open"]
-    promo = [c for c in opens if c["type"] == "promotion"]
-    sweep = [c for c in opens if c["type"] == "sweep"]
-    wiki = [c for c in opens if c["type"] == "wiki-promotion"]
+    opens = [c for c in state.get("candidates", []) if c.get("status") == "open"]
+    promo = [c for c in opens if c.get("type") == "promotion"]
+    sweep = [c for c in opens if c.get("type") == "sweep"]
+    wiki = [c for c in opens if c.get("type") == "wiki-promotion"]
 
     def fmt(c):
-        w = _weeks_since(c["first_seen"])
+        w = _weeks_since(c.get("first_seen", ""))
         age = "this week" if w == 0 else f"{w}w waiting"
-        return f"- `#{c['id']}` [{c['scope']}] ({age}) {c['text']}"
+        obs = f" [{c['obs_type']}]" if c.get("obs_type") else ""
+        return f"- `#{c.get('id', '?')}` [{c.get('scope', '?')}]{obs} ({age}) {c.get('text', '')}"
 
     pc = (f"# Promotion candidates\n\n"
           f"_Regenerated weekly. General rule candidates -> CLAUDE.md / global memory. "
           f"You decide; the auto-pipeline NEVER writes to a hand-curated CLAUDE.md. "
-          f"Accept/reject by the candidate's `#id`._\n\n_Last run: {TODAY}_\n\n---\n\n"
+          f"Accept/reject by the candidate's `#id`._\n\n_Last run: {TODAY} | candidates-state.json is the source of truth - this file is a snapshot; after accept/reject refresh with `consolidate.py --reviews-only`_\n\n---\n\n"
           + ("\n".join(fmt(c) for c in promo) if promo else "_No open promotion candidates._") + "\n")
     PROMOTION_CANDIDATES_PATH.write_text(pc, encoding="utf-8")
 
@@ -881,7 +912,7 @@ def write_review_files(state):
           f"_Regenerated weekly. Superseded or stale entries - proposed for archiving. "
           f"Evergreen sections ({', '.join(EVERGREEN_SECTIONS)}) are exempt. "
           f"Archived ONLY with your approval. Accept/reject by the candidate's `#id`._\n\n"
-          f"_Last run: {TODAY}_\n\n---\n\n"
+          f"_Last run: {TODAY} | candidates-state.json is the source of truth - this file is a snapshot; after accept/reject refresh with `consolidate.py --reviews-only`_\n\n---\n\n"
           + ("\n".join(fmt(c) for c in sweep) if sweep else "_No open sweep candidates._") + "\n")
     SWEEP_CANDIDATES_PATH.write_text(sc, encoding="utf-8")
 
@@ -890,23 +921,23 @@ def write_review_files(state):
           f"curated per-area campaign file (the second layer: operational -> curated). SEPARATE from promotion "
           f"candidates (a GENERAL rule -> CLAUDE.md; an account fact -> wiki). The auto-pipeline NEVER writes to "
           f"the curated wiki - ONLY with your approval. Accept/reject by the candidate's `#id`._\n\n"
-          f"_Last run: {TODAY}_\n\n---\n\n"
+          f"_Last run: {TODAY} | candidates-state.json is the source of truth - this file is a snapshot; after accept/reject refresh with `consolidate.py --reviews-only`_\n\n---\n\n"
           + ("\n".join(fmt(c) for c in wiki) if wiki else "_No open wiki-promotion candidates._") + "\n")
     WIKI_PROMOTION_CANDIDATES_PATH.write_text(wc, encoding="utf-8")
 
     # Cadence: tool-craft + client-learning review files (new candidate types)
-    craft = [c for c in opens if c["type"] == "tool-craft"]
-    learn = [c for c in opens if c["type"] == "client-learning"]
+    craft = [c for c in opens if c.get("type") == "tool-craft"]
+    learn = [c for c in opens if c.get("type") == "client-learning"]
     tc = (f"# Tool-craft candidates (system-level, enforcement)\n\n"
           f"_Regenerated weekly. Tool-usage craft lessons from transcript mining. Once approved, "
           f"add to `tool-craft.md` (WARN gate / advisory). Accept/reject by the candidate's `#id`._\n\n"
-          f"_Last run: {TODAY}_\n\n---\n\n"
+          f"_Last run: {TODAY} | candidates-state.json is the source of truth - this file is a snapshot; after accept/reject refresh with `consolidate.py --reviews-only`_\n\n---\n\n"
           + ("\n".join(fmt(c) for c in craft) if craft else "_No open tool-craft candidates._") + "\n")
     (REPO_ROOT / "system" / "memory" / "tool-craft-candidates.md").write_text(tc, encoding="utf-8")
     cl = (f"# Client-learning candidates (cheap-Dreaming)\n\n"
           f"_Regenerated weekly. Client learnings mined from raw transcripts (MEDIUM gate, no-mixing). "
           f"Once approved, add to the client's learnings.md / wiki. Accept/reject by the candidate's `#id`._\n\n"
-          f"_Last run: {TODAY}_\n\n---\n\n"
+          f"_Last run: {TODAY} | candidates-state.json is the source of truth - this file is a snapshot; after accept/reject refresh with `consolidate.py --reviews-only`_\n\n---\n\n"
           + ("\n".join(fmt(c) for c in learn) if learn else "_No open client-learning candidates._") + "\n")
     (REPO_ROOT / "system" / "memory" / "client-learning-candidates.md").write_text(cl, encoding="utf-8")
 
@@ -914,10 +945,16 @@ def write_review_files(state):
           f"+ {len(craft)} tool-craft + {len(learn)} client-learning -> review files + state")
 
 
+NEW_EXTRACTORS_STATUS = {"ok": True, "error": None}
+
+
 def detect_new_extractors(dry_run=False):
     """Cadence: tool-craft (craft_judge) + client-learning (dream_extractor) candidates from
     transcript mining. FAULT-TOLERANT: if anything fails (API/transcript/import), the existing
-    consolidation does NOT break - returns [] and moves on. dry_run: no API calls (candidates()
+    consolidation does NOT break - returns [] and moves on; the failure is recorded in
+    NEW_EXTRACTORS_STATUS (-> state last_run -> nudge warning) so it is not silent.
+    The dream window is 10 days (weekly cadence + overlap): one missed weekly run no longer
+    loses that week's transcript learnings for good. dry_run: no API calls (candidates()
     would be costly), just notes it would run."""
     if dry_run:
         print("  [new-extractors] dry-run: skipped (avoid API cost)")
@@ -928,11 +965,12 @@ def detect_new_extractors(dry_run=False):
         import dream_extractor
     except Exception as e:
         print(f"  [new-extractors] import error, skipped: {e}")
+        NEW_EXTRACTORS_STATUS.update(ok=False, error=f"import: {e}")
         return []
     try:
         tdir = transcript_lib.transcript_dir(REPO_ROOT)  # explicit world-root (cron cwd != root)
         craft = craft_judge.candidates(tdir)
-        learn = dream_extractor.candidates(tdir, days=7)
+        learn = dream_extractor.candidates(tdir, days=10)
         # cross-stream dedup: a client-learning that is really a tool-craft -> system-level (dropped here)
         ctok = [_tokens(c["text"]) for c in craft]
         learn = [l for l in learn if not any(_same_candidate(_tokens(l["text"]), ct) for ct in ctok)]
@@ -940,6 +978,7 @@ def detect_new_extractors(dry_run=False):
         return craft + learn
     except Exception as e:
         print(f"  [new-extractors] run error, skipped: {e}")
+        NEW_EXTRACTORS_STATUS.update(ok=False, error=f"run: {e}")
         return []
 
 
@@ -949,10 +988,16 @@ def main():
     parser.add_argument("--client", help="Single client only (e.g. acme-corp)")
     parser.add_argument("--system-only", action="store_true", help="Only system/memory/learnings.md")
     parser.add_argument("--cross-client-only", action="store_true", help="Only the cross-client pattern analysis")
+    parser.add_argument("--reviews-only", action="store_true",
+                        help="Regenerate the review .md files from candidates-state.json (no API; run after accept/reject)")
     parser.add_argument("--world", help="World root (user data). Default: AGENCY_WORLD_ROOT / CLAUDE_PROJECT_DIR / cwd")
     args = parser.parse_args()
 
     configure(resolve_world_root(args.world))
+
+    if args.reviews_only:
+        write_review_files(load_state())
+        return
 
     if args.cross_client_only:
         print(f"\nCross-client pattern analysis | {TODAY}")
@@ -995,6 +1040,11 @@ def main():
         if not args.dry_run:
             _ensure_tool_craft_scaffold()  # self-bootstrap for 0.1.x -> 0.2.0 upgrades
             state = sync_candidates(detected, load_state())
+            # Run health record -> candidates_nudge warns at session start if the
+            # Dreaming branch failed (otherwise the failure is silent)
+            state["last_run"] = {"date": TODAY,
+                                 "new_extractors_ok": NEW_EXTRACTORS_STATUS["ok"],
+                                 "error": NEW_EXTRACTORS_STATUS["error"]}
             save_state(state)
             write_review_files(state)
         print(f"\nCross-client pattern analysis | {TODAY}")
