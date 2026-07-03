@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-07-03
+
 ### Added
 - **World-configurable placeholders, footer and output language** (completes the i18n
   genericization; found while dry-running a Hungarian world flip). Four new world-config keys
