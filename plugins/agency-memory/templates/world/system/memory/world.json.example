@@ -46,7 +46,10 @@
 
   "curated_prefix": "kampanyok-",
 
-  "_comment_memory_guard": "Optional. project_memory_path = where the agent's global auto-memory lives (null = derive from world root, matching Claude Code's ~/.claude/projects/<slug>/memory scheme). guards = file-path patterns -> memory files to surface before a Write/Edit. Empty guards = the PreToolUse hook is a no-op.",
+  "_comment_briefing_retention": "Optional. briefing_keep_checkpoints > 0 = the weekly system consolidation keeps only the newest N checkpoint blocks in the next-briefing section and sweeps the rest to system/memory/archive/briefing-archive.md (nothing is deleted). 0 (default) = off, the section only grows. Blocks are recognized by briefing_block_regex (default: lines starting with **...CHECKPOINT).",
+  "briefing_keep_checkpoints": 1,
+
+  "_comment_memory_guard": "Optional. project_memory_path = where the agent's global auto-memory lives (null = derive from world root, matching Claude Code's ~/.claude/projects/<slug>/memory scheme). guards = file-path patterns -> memory files to surface before a Write/Edit. Empty guards = the PreToolUse hook is a no-op. The no-mixing check (warn when a write under clients/<X>/ mentions another client) is automatic and needs no config.",
   "memory_guard": {
     "project_memory_path": null,
     "guards": [

@@ -68,6 +68,23 @@ def candidates_nudge(state):
           f"Client candidates surface when you load that client (scoped to it only). "
           f"Global: promotion-candidates.md / sweep-candidates.md.")
 
+    # #11: global/system candidates have NO point-of-use venue (no client load ever
+    # surfaces them), so a count alone lets them rot. Show the oldest few in full.
+    GLOBAL_DETAIL_CAP = 5
+    details = sorted((c for c in global_cands if c.get("scope") in GLOBAL_SCOPES),
+                     key=lambda c: c.get("first_seen", ""))
+    if details:
+        print("   Oldest global/system candidates (accept/reject by #id):")
+        for c in details[:GLOBAL_DETAIL_CAP]:
+            w = _weeks_since(c.get("first_seen", ""))
+            age_s = "this week" if w == 0 else f"{w}w"
+            text = c.get("text", "")
+            if len(text) > 220:
+                text = text[:220] + "..."
+            print(f"    #{c.get('id', '?')} [{c.get('type', '?')}] ({age_s}) {text}")
+        if len(details) > GLOBAL_DETAIL_CAP:
+            print(f"    ... +{len(details) - GLOBAL_DETAIL_CAP} more in the review files")
+
 
 def last_run_nudge(state):
     """Warn when the last weekly run's transcript-mining (Dreaming) branch failed -

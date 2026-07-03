@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-07-03
+
+### Added
+- **No-mixing guard on the agent write path** (memory-guard hook): writing under
+  `clients/<X>/` with content that mentions ANOTHER known client triggers a WARN via
+  `additionalContext`. Until now the machine no-mixing gate existed only on the
+  transcript-mining path (dream_extractor leak check); the primary path - the agent
+  writing a client's memory at session end - was convention-only. Automatic when the
+  world has a `clients/` dir; no config needed; WARN-only (a conscious cross-client
+  reference stays possible).
+- **Briefing retention** (`briefing_keep_checkpoints`, default 0 = off): the
+  verbatim-protected next-briefing section was a one-way valve - it only ever grew
+  (the first production world hit 43KB injected at every session start). When enabled,
+  the weekly system consolidation keeps the newest N checkpoint blocks and APPENDS the
+  swept ones to `system/memory/archive/briefing-archive.md` - deterministic trim, no
+  LLM involvement, nothing deleted. Block boundaries via `briefing_block_regex`
+  (default: lines starting with `**...CHECKPOINT`).
+- **Global/system candidates surface contentfully at session start**: they have no
+  point-of-use venue (no client load ever shows them), so a bare count let them rot -
+  the first production world had candidates 3+ weeks stale. `candidates_nudge` now
+  prints the oldest few (cap 5, id + type + age + text) so they can be accepted or
+  rejected on the spot.
+
 ## [0.2.6] - 2026-07-03
 
 Silent-failure hardening + review-cycle quality-of-life round (sourced from the first

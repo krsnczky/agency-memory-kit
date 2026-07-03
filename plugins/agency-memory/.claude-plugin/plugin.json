@@ -1,7 +1,7 @@
 {
   "name": "agency-memory",
   "displayName": "Agency Memory",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Per-client, no-mixing memory engine for agencies: deterministic context loading, weekly consolidation, human-approved candidate review, a self-improving tool-craft loop (mine recurring tool mistakes -> WARN gates), and cheap-Dreaming client-learning mining from raw transcripts.",
   "author": {
     "name": "Krusniczky Richárd"
