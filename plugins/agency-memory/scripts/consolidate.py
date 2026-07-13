@@ -417,6 +417,25 @@ def _language_drifted(before, after):
     return rb >= 0.01 and ra < rb * 0.6, rb, ra
 
 
+def _blank_briefing_for_prompt(text):
+    """The next-briefing section is verbatim-preserved from the ORIGINAL by
+    rebuild_learnings - sending its (potentially huge, hand-curated) body through
+    the LLM wastes the output budget on content the script throws away, and on a
+    large world it alone blew past consolidate_max_tokens. Replace the body with
+    a stub in the PROMPT INPUT only; the file on disk is untouched."""
+    lines = text.split("\n")
+    try:
+        h = next(i for i, l in enumerate(lines)
+                 if l.startswith("## ") and l[3:].strip() == NEXT_BRIEFING_HEADING)
+    except StopIteration:
+        return text
+    end = h + 1
+    while end < len(lines) and not lines[end].startswith("## "):
+        end += 1
+    stub = ["", "(hand-curated handoff - the script preserves it verbatim; do NOT reproduce its content)", "", "---", ""]
+    return "\n".join(lines[:h + 1] + stub + lines[end:])
+
+
 def consolidate_client(client_dir_name, dry_run=False):
     client_path = CLIENTS_DIR / client_dir_name
     learnings_path = client_path / "memory" / "learnings.md"
@@ -443,7 +462,7 @@ Client: {client_dir_name}
 Date: {TODAY}
 
 CURRENT LEARNINGS.MD:
-{learnings}
+{_blank_briefing_for_prompt(learnings)}
 
 LOG.MD (recent session summaries):
 {log_content[-8000:] if log_content else "None."}
@@ -476,11 +495,15 @@ IMPORTANT RULES:
     client_api = anthropic.Anthropic()
 
     try:
-        response = client_api.messages.create(
+        # Streaming is required at this max_tokens: the SDK cuts non-streaming
+        # requests at ~10 minutes, and a large learnings.md generates longer
+        # (observed: the biggest file died with a network timeout, not truncation).
+        with client_api.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=CONSOLIDATE_MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
     except Exception as e:
         print(f"  [{client_dir_name}] API error: {e}")
         _audit_skip(client_dir_name, f"API error: {e}")
@@ -596,7 +619,7 @@ Your job: return the CONSOLIDATED, cleaned version of learnings.md.
 Date: {TODAY}
 
 CURRENT LEARNINGS.MD:
-{learnings}
+{_blank_briefing_for_prompt(learnings)}
 
 CHANGELOG.MD (recent changes, newest first):
 {log_content[:8000] if log_content else "None."}
@@ -628,11 +651,13 @@ IMPORTANT RULES:
 
     client_api = anthropic.Anthropic()
     try:
-        response = client_api.messages.create(
+        # Streaming required - see consolidate_client
+        with client_api.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=CONSOLIDATE_MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
     except Exception as e:
         print(f"  [system] API error: {e}")
         _audit_skip("system", f"API error: {e}")
