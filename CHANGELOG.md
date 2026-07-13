@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-07-13
+
 Production incident round - three bugs reported from the second production world
 (2026-07-10 weekly run), all three verified present in the first production world too.
 
