@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-07-13
+
 ### Fixed
 - **Large-file consolidation died even after the 0.2.8 max_tokens raise** - two more
   ceilings found while unsticking the first production world's biggest file (64k chars):
