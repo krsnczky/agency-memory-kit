@@ -41,6 +41,22 @@ Changelog:
                  files (separate stream from promotion: a GENERAL rule -> CLAUDE.md, an
                  account FACT -> wiki). Runs only for clients that keep curated per-area
                  files; gets the curated content so it never proposes a duplicate.
+  2026-07-13 - Production incident round (bug report from the second production world,
+               all three verified in the first one too):
+               * max_tokens 3000 -> world-config consolidate_max_tokens (default 16000):
+                 3000 was a silent ceiling - the largest learnings.md files truncated,
+                 the safety skip kept them unconsolidated forever (self-worsening).
+               * Language-drift guard: if the consolidated output loses >=50% of the
+                 input's non-ASCII letter ratio (translation / bilingual duplication,
+                 seen with a mis-set output_language), the write is skipped + flagged.
+                 Prompts now also forbid translating or duplicating existing entries.
+               * Lossless hardened: existing entries must survive character-for-character
+                 (prompt) AND _reinject_dropped re-injects any bullet whose hard tokens
+                 (paths, filenames, versions, backticked spans) vanished - the 60%
+                 token-overlap check alone accepted lossy shortening.
+               * Skip visibility: skipped entities (truncation, drift, API error) go to
+                 consolidation-audit.md + an end-of-run warning; they used to be
+                 invisible (audit logged successes only), hiding failures for weeks.
   2026-07-03 - Silent-failure hardening + review-cycle QoL:
                * stop_reason==max_tokens is detected on both consolidation calls: the
                  write is skipped and the original kept (no silent truncation).
@@ -130,6 +146,11 @@ def configure(world_root):
     # this the verbatim-protected briefing is a one-way valve - it only ever grows.
     BRIEFING_KEEP_CHECKPOINTS = int(cfg.get("briefing_keep_checkpoints", 0) or 0)
     BRIEFING_BLOCK_REGEX = cfg.get("briefing_block_regex", r"^\*\*[^\n]*CHECKPOINT")
+    # Output cap for the consolidation LLM calls. The consolidation is lossless, so the
+    # output is roughly input-sized: 3000 was a silent ceiling - every learnings.md that
+    # consolidated above ~3000 tokens was skipped forever and only grew (self-worsening).
+    global CONSOLIDATE_MAX_TOKENS
+    CONSOLIDATE_MAX_TOKENS = int(cfg.get("consolidate_max_tokens", 16000) or 16000)
 
     mem = REPO_ROOT / "system" / "memory"
     PROMOTION_CANDIDATES_PATH = mem / "promotion-candidates.md"
@@ -188,14 +209,39 @@ def _clean_body(body):
     return "\n".join(lines).strip()
 
 
+_HARD_TOKEN_RE = re.compile(
+    r"`[^`]+`"                                  # backticked spans (commands, paths, ids)
+    r"|(?<![\w`])/[\w~][\w./-]{3,}"             # absolute/anchored file paths
+    r"|\b\d+\.\d+(?:\.\d+)*\b"                  # version numbers
+    r"|\b[\w-]+\.(?:py|md|sh|json|yaml|yml|plist|txt|js|html)\b"  # filenames
+)
+
+
+def _hard_tokens(text):
+    """Concrete facts a consolidation must never lose: paths, filenames, versions,
+    backticked spans. Production incident: a 'lossless' pass shortened surviving
+    bullets and dropped exactly these (a python path, a version, a 'tell Ricsi' note
+    in backticks) - the 60% token-overlap survival check cannot see that."""
+    return set(m.group(0) for m in _HARD_TOKEN_RE.finditer(text))
+
+
 def _reinject_dropped(orig_body, new_body):
     """Lossless guarantee for protected sections: any original bullet that does NOT
-    survive in the consolidated body (token overlap < 60%) is appended back.
-    Dedup/merge is preserved (a reworded/merged bullet survives because its tokens
-    overlap), but a UNIQUE entry cannot be lost on a weekly run."""
+    survive in the consolidated body (token overlap < 60%), OR that survived only as
+    a lossy paraphrase (one of its hard tokens is gone from the whole section), is
+    appended back verbatim. Dedup/merge is preserved (a reworded/merged bullet
+    survives because its tokens overlap), but neither a UNIQUE entry nor a concrete
+    fact can be lost on a weekly run. Re-injection may briefly duplicate a shortened
+    variant; the next pass dedups keeping the more detailed one (prompt rule)."""
     orig_bullets = extract_bullets(orig_body)
     new_sets = [_tokens(b) for b in extract_bullets(new_body)]
     dropped = [b for b in orig_bullets if not _survives(_tokens(b), new_sets)]
+    for b in orig_bullets:
+        if b in dropped:
+            continue
+        lost = [t for t in _hard_tokens(b) if t not in new_body]
+        if lost:
+            dropped.append(b)
     if not dropped:
         return new_body
     base = new_body.rstrip()
@@ -338,6 +384,39 @@ def _audit_consolidation(scope, before, after, backup_path):
         pass
 
 
+SKIPPED = []  # (scope, reason) - end-of-run visibility; a silent skip hid failures for weeks
+
+
+def _audit_skip(scope, reason):
+    """Skips go into the audit trail too - a skipped entity used to be invisible
+    (the audit only recorded successes, so a stuck file went unnoticed for weeks)."""
+    SKIPPED.append((scope, reason))
+    try:
+        p = REPO_ROOT / "system" / "memory" / "consolidation-audit.md"
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(f"- {TODAY} | {scope} | SKIPPED: {reason}\n")
+    except Exception:
+        pass
+
+
+def _lang_ratio(text):
+    """Share of non-ASCII letters among all letters - a cheap, language-agnostic
+    fingerprint (Hungarian ~10%, English ~0%)."""
+    alpha = [c for c in text if c.isalpha()]
+    if not alpha:
+        return 0.0
+    return sum(1 for c in alpha if ord(c) > 127) / len(alpha)
+
+
+def _language_drifted(before, after):
+    """True when a non-English (accented) file came back substantially de-accented:
+    the model translated to English or added translated duplicates (duplication
+    roughly HALVES the ratio, hence the 0.6 factor - a legit consolidation barely
+    moves it). Guards against a misconfigured output_language corrupting the data."""
+    rb, ra = _lang_ratio(before), _lang_ratio(after)
+    return rb >= 0.01 and ra < rb * 0.6, rb, ra
+
+
 def consolidate_client(client_dir_name, dry_run=False):
     client_path = CLIENTS_DIR / client_dir_name
     learnings_path = client_path / "memory" / "learnings.md"
@@ -370,7 +449,7 @@ LOG.MD (recent session summaries):
 {log_content[-8000:] if log_content else "None."}
 
 Consolidation tasks:
-1. DEDUPLICATION: if two entries say the same thing, keep the more detailed/recent one
+1. DEDUPLICATION: if two entries say the same thing, keep the more detailed/recent one VERBATIM - never merge into a shorter paraphrase
 2. CONFLICT RESOLUTION: if two entries conflict, use log.md to decide which is newer/correct
 3. IMPLICIT LEARNINGS: pull EVERY genuine, durable learning out of log.md that learnings does not yet contain. No count limit, but a STRICT gate:
    - It is a learning ONLY if: (a) durable (not a one-off event), (b) actionable, (c) generalizes above a single day's number.
@@ -384,7 +463,8 @@ Sections:
 {sections_str}
 
 IMPORTANT RULES:
-- Write ALL content in {OUTPUT_LANGUAGE} (the language of the existing entries) - never switch language
+- Write ALL content in {OUTPUT_LANGUAGE} - NEVER translate an existing entry and NEVER add a translated duplicate of one; the file must stay monolingual
+- EXISTING entries are either kept CHARACTER-FOR-CHARACTER or dropped as exact duplicates of a more detailed entry - never shorten, summarize or reword them. Concrete facts (file paths, IDs, version numbers, dates, names, commands, "tell X" notes) must survive verbatim
 - Return only the learnings.md content, nothing else
 - Keep the header and the footer (the "{FOOTER_PREFIX.lstrip('_')}" line)
 - If a section has no data, keep the "{PLACEHOLDER}" placeholder
@@ -398,15 +478,17 @@ IMPORTANT RULES:
     try:
         response = client_api.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=3000,
+            max_tokens=CONSOLIDATE_MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as e:
         print(f"  [{client_dir_name}] API error: {e}")
+        _audit_skip(client_dir_name, f"API error: {e}")
         return False
 
     if response.stop_reason == "max_tokens":
-        print(f"  [{client_dir_name}] TRUNCATED output (max_tokens hit) - write skipped, original kept")
+        print(f"  [{client_dir_name}] TRUNCATED output (max_tokens={CONSOLIDATE_MAX_TOKENS} hit) - write skipped, original kept")
+        _audit_skip(client_dir_name, f"truncated at max_tokens={CONSOLIDATE_MAX_TOKENS}")
         return False
 
     consolidated = response.content[0].text.strip()
@@ -418,6 +500,15 @@ IMPORTANT RULES:
     consolidated = rebuild_learnings(consolidated, learnings, SECTIONS, TODAY,
                                      verbatim=(NEXT_BRIEFING_HEADING,),
                                      protected=PROTECTED_SECTIONS)
+
+    # Language guard: a mis-set output_language makes the model TRANSLATE the file
+    # (observed in production: full English rewrite / bilingual duplication) - skip.
+    drifted, rb, ra = _language_drifted(learnings, consolidated)
+    if drifted:
+        print(f"  [{client_dir_name}] LANGUAGE DRIFT (non-ASCII letters {rb:.1%} -> {ra:.1%}) - "
+              f"write skipped, original kept. Check world.json output_language!")
+        _audit_skip(client_dir_name, f"language drift {rb:.1%}->{ra:.1%} (check output_language)")
+        return False
 
     if dry_run:
         print(f"\n  [{client_dir_name}] DRY RUN - consolidated output:")
@@ -511,7 +602,7 @@ CHANGELOG.MD (recent changes, newest first):
 {log_content[:8000] if log_content else "None."}
 
 Consolidation tasks:
-1. DEDUPLICATION: if two entries say the same thing, keep the more detailed/recent one
+1. DEDUPLICATION: if two entries say the same thing, keep the more detailed/recent one VERBATIM - never merge into a shorter paraphrase
 2. CONFLICT RESOLUTION: use the CHANGELOG to decide which is newer/correct
 3. IMPLICIT LEARNINGS: pull EVERY genuine, durable learning out of the CHANGELOG that learnings does not yet contain. No count limit, but a STRICT gate:
    - It is a learning ONLY if: (a) durable (not a one-off event), (b) actionable, (c) generalizes above a single change.
@@ -525,7 +616,8 @@ Sections:
 {sections_str}
 
 IMPORTANT RULES:
-- Write ALL content in {OUTPUT_LANGUAGE} (the language of the existing entries) - never switch language
+- Write ALL content in {OUTPUT_LANGUAGE} - NEVER translate an existing entry and NEVER add a translated duplicate of one; the file must stay monolingual
+- EXISTING entries are either kept CHARACTER-FOR-CHARACTER or dropped as exact duplicates of a more detailed entry - never shorten, summarize or reword them. Concrete facts (file paths, IDs, version numbers, dates, names, commands, "tell X" notes) must survive verbatim
 - Return only the learnings.md content, nothing else
 - Keep the header and the footer (the "{FOOTER_PREFIX.lstrip('_')}" line)
 - If a section has no data, keep the "{PLACEHOLDER}" placeholder
@@ -538,15 +630,17 @@ IMPORTANT RULES:
     try:
         response = client_api.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=3000,
+            max_tokens=CONSOLIDATE_MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as e:
         print(f"  [system] API error: {e}")
+        _audit_skip("system", f"API error: {e}")
         return False
 
     if response.stop_reason == "max_tokens":
-        print(f"  [system] TRUNCATED output (max_tokens hit) - write skipped, original kept")
+        print(f"  [system] TRUNCATED output (max_tokens={CONSOLIDATE_MAX_TOKENS} hit) - write skipped, original kept")
+        _audit_skip("system", f"truncated at max_tokens={CONSOLIDATE_MAX_TOKENS}")
         return False
 
     consolidated = response.content[0].text.strip()
@@ -558,6 +652,14 @@ IMPORTANT RULES:
         verbatim=(NEXT_BRIEFING_HEADING,),
         protected=PROTECTED_SYSTEM_SECTIONS,
     )
+
+    # Language guard (see consolidate_client)
+    drifted, rb, ra = _language_drifted(learnings, consolidated)
+    if drifted:
+        print(f"  [system] LANGUAGE DRIFT (non-ASCII letters {rb:.1%} -> {ra:.1%}) - "
+              f"write skipped, original kept. Check world.json output_language!")
+        _audit_skip("system", f"language drift {rb:.1%}->{ra:.1%} (check output_language)")
+        return False
 
     # Briefing retention (#6): verbatim protects the section from the LLM; this trims
     # it deterministically so it does not grow without bound.
@@ -1104,6 +1206,9 @@ def main():
         detect_cross_client_patterns(dry_run=args.dry_run)
 
     print(f"\nDone: system={'OK' if success else 'skip'} | clients: {client_success}/{len(clients)}")
+    if SKIPPED:
+        listing = ", ".join(f"{s} ({r})" for s, r in SKIPPED)
+        print(f"⚠️ {len(SKIPPED)} entity SKIPPED this run: {listing} - see consolidation-audit.md")
 
 
 if __name__ == "__main__":

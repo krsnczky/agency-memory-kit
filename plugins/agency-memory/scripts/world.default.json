@@ -42,6 +42,7 @@
   "output_language": "English",
   "briefing_keep_checkpoints": 0,
   "briefing_block_regex": "^\\*\\*[^\\n]*CHECKPOINT",
+  "consolidate_max_tokens": 16000,
   "memory_guard": {
     "project_memory_path": null,
     "guards": []
