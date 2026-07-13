@@ -476,11 +476,15 @@ IMPORTANT RULES:
     client_api = anthropic.Anthropic()
 
     try:
-        response = client_api.messages.create(
+        # Streaming is required at this max_tokens: the SDK cuts non-streaming
+        # requests at ~10 minutes, and a large learnings.md generates longer
+        # (observed: the biggest file died with a network timeout, not truncation).
+        with client_api.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=CONSOLIDATE_MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
     except Exception as e:
         print(f"  [{client_dir_name}] API error: {e}")
         _audit_skip(client_dir_name, f"API error: {e}")
@@ -628,11 +632,13 @@ IMPORTANT RULES:
 
     client_api = anthropic.Anthropic()
     try:
-        response = client_api.messages.create(
+        # Streaming required - see consolidate_client
+        with client_api.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=CONSOLIDATE_MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
     except Exception as e:
         print(f"  [system] API error: {e}")
         _audit_skip("system", f"API error: {e}")
