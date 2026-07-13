@@ -46,6 +46,12 @@
 
   "curated_prefix": "kampanyok-",
 
+  "_comment_i18n": "CRITICAL for a non-English world: without these four keys the engine falls back to ENGLISH defaults - the consolidation prompt will then instruct the model to write (i.e. TRANSLATE your data to) English, placeholder sections are mis-detected and the footer leaks into section bodies. If your world is not English, set ALL FOUR. (A language-drift guard skips the write if this happens, but fix the config, do not rely on the guard.)",
+  "output_language": "Hungarian",
+  "placeholder_markers": ["_Még nincs", "_Nincs aktív", "_Induló"],
+  "placeholder": "_Még nincs adat._",
+  "footer_prefix": "_Utolsó frissítés",
+
   "_comment_briefing_retention": "Optional. briefing_keep_checkpoints > 0 = the weekly system consolidation keeps only the newest N checkpoint blocks in the next-briefing section and sweeps the rest to system/memory/archive/briefing-archive.md (nothing is deleted). 0 (default) = off, the section only grows. Blocks are recognized by briefing_block_regex (default: lines starting with **...CHECKPOINT).",
   "briefing_keep_checkpoints": 1,
 

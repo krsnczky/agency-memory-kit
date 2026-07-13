@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-07-13
+
+Production incident round - three bugs reported from the second production world
+(2026-07-10 weekly run), all three verified present in the first production world too.
+
+### Fixed
+- **Language drift corrupted non-English memory (SEVERE):** with `output_language`
+  missing from a non-English world's `world.json`, the engine falls back to English and
+  the consolidation prompt actively instructs the model to TRANSLATE the data (observed:
+  a full file rewritten in English; bilingual duplication doubling another file). Three
+  layers now: (1) `world.json.example` ships the four i18n keys (`output_language`,
+  `placeholder_markers`, `placeholder`, `footer_prefix`) with a CRITICAL warning - they
+  were missing from the example, which is how a production world ended up half-configured;
+  (2) the prompts explicitly forbid translating existing entries or adding translated
+  duplicates; (3) a language-drift guard compares the non-ASCII letter ratio of input vs
+  output and SKIPS the write (+ audit flag) when the ratio drops below 60% of the input's.
+- **"Lossless" accepted lossy shortening of surviving entries (SEVERE):** the 60%
+  token-overlap survival check let the model shorten existing bullets and drop concrete
+  facts (file paths, version numbers, "tell X" notes). Now: the prompts require existing
+  entries to survive character-for-character (dedup may only drop exact duplicates of a
+  more detailed entry), and `_reinject_dropped` re-injects any original bullet whose hard
+  tokens (paths, filenames, version numbers, backticked spans) vanished from the section.
+- **`max_tokens=3000` was a silent ceiling:** the consolidation is lossless, so output is
+  input-sized - every learnings.md above ~3000 output tokens truncated, the safety skip
+  kept the original, and the file just kept growing (self-worsening; the three largest
+  files in both production worlds were stuck for weeks). Now world-configurable:
+  `consolidate_max_tokens`, default 16000.
+- **Skipped entities were invisible:** the audit trail only logged successes, so a stuck
+  file went unnoticed until a human asked. Skips (truncation, language drift, API error)
+  now write an audit line and the run ends with a warning listing every skipped entity.
+
 ## [0.2.7] - 2026-07-03
 
 ### Added
