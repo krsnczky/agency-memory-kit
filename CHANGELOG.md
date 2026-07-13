@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Large-file consolidation died even after the 0.2.8 max_tokens raise** - two more
+  ceilings found while unsticking the first production world's biggest file (64k chars):
+  (1) the SDK cuts NON-STREAMING requests at ~10 minutes, so the call died with a network
+  timeout before finishing - the consolidation calls now stream
+  (`messages.stream` + `get_final_message`, drop-in for the `stop_reason`/content checks);
+  (2) the hand-curated next-briefing section was sent through the LLM only to be thrown
+  away (rebuild restores it verbatim from the original), wasting most of the output
+  budget - on the production file it alone blew past 16000 tokens. The briefing BODY is
+  now replaced with a stub in the prompt input (`_blank_briefing_for_prompt`); the file
+  on disk is untouched. Result on the production file: prompt input 64.5k -> 12k chars,
+  consolidation finishes comfortably.
+
 ## [0.2.8] - 2026-07-13
 
 Production incident round - three bugs reported from the second production world
