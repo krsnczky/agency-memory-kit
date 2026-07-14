@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-07-14
+
+### Fixed
+- **All five hooks failed to run on Claude Code 2.1.209+ (BLOCKER):** the hooks used
+  shell-form commands (`"command": "${user_config.python} \"...script.py\""`). Claude Code
+  2.1.209 rejects any shell-form plugin hook whose command references `${user_config.*}`,
+  because the substituted value would be re-parsed by the shell (injection risk). Every hook
+  died with `Failed to run: Hook from plugin ... references ${user_config.*} in a shell-form
+  command`, disabling the whole memory engine (no briefing, no context load, no guards).
+  All five hooks are now in exec form (`"command": "${user_config.python}", "args":
+  ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/<script>.py"]`): Claude Code spawns the interpreter
+  directly with the script path as a single argv element, no shell in between, so the
+  `${user_config.*}` substitution is safe. `${CLAUDE_PLUGIN_ROOT}` still resolves in the
+  `args` array. Verified end-to-end against 2.1.209 with `--plugin-dir`: SessionStart,
+  UserPromptSubmit, Stop, and both PreToolUse guards run with exit 0 and no
+  `hook_non_blocking_error`.
+
 ## [0.2.9] - 2026-07-13
 
 ### Fixed
