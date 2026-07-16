@@ -1,7 +1,34 @@
-# Agency Memory Kit
+<p align="center">
+  <img src="assets/banner.png" alt="Agency Memory Kit - persistent, per-client memory for Claude Code" width="760">
+</p>
 
-Deterministic, folder-based memory for [Claude Code](https://claude.com/claude-code)
-when you run an agency with many clients. Packaged as a Claude Code **plugin**.
+<h1 align="center">Agency Memory Kit</h1>
+
+<p align="center">
+  Deterministic, folder-based memory for <a href="https://claude.com/claude-code">Claude Code</a><br>
+  when you run an agency with many clients. Packaged as a Claude Code <strong>plugin</strong>.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/version-0.2.10-CD5334.svg?style=flat-square" alt="Version 0.2.10">
+  <img src="https://img.shields.io/badge/Claude%20Code-plugin-CD5334.svg?style=flat-square" alt="Claude Code plugin">
+  <img src="https://img.shields.io/badge/status-open%20beta-yellow.svg?style=flat-square" alt="Status: open beta">
+  <a href="https://github.com/krsnczky/agency-memory-kit/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs welcome"></a>
+</p>
+
+## Contents
+
+- [Open beta, read this first](#open-beta-read-this-first)
+- [The idea](#the-idea)
+- [Engine and data are separate](#engine-and-data-are-separate)
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Usage](#usage)
+- [Structure](#structure)
+- [Security](#security)
+- [License](#license)
 
 ## Open beta, read this first
 
